@@ -41,6 +41,6 @@ class RingPreviewView(context: Context) : View(context) {
         paint.strokeWidth = stroke
         paint.color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
         bounds.set(cx - radius, cy - radius, cx + radius, cy + radius)
-        canvas.drawArc(bounds, -90f, 360f * batteryPercent / 100f, false, paint)
+        canvas.drawArc(bounds, -90f, -360f * batteryPercent / 100f, false, paint)
     }
 }

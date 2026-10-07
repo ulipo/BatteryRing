@@ -25,8 +25,10 @@ import android.widget.TextView
 import android.widget.Toast
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListener {
+    private val positionStepDp = 0.25f
     private lateinit var prefs: SharedPreferences
     private lateinit var enabledSwitch: Switch
     private lateinit var serviceStatus: TextView
@@ -162,10 +164,11 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         xLabel = valueLabel("")
         root.addView(xLabel)
         xSeek = SeekBar(this).apply {
-            max = widthDp
-            setOnSeekBarChangeListener(simpleSeekListener { value ->
-                prefs.edit().putFloat(Prefs.KEY_CENTER_X_DP, value.toFloat()).apply()
-                xLabel.text = "Posizione X: ${value} dp"
+            max = (widthDp / positionStepDp).roundToInt().coerceAtLeast(1)
+            setOnSeekBarChangeListener(simpleSeekListener { progress ->
+                val value = progressToPositionDp(progress)
+                prefs.edit().putFloat(Prefs.KEY_CENTER_X_DP, value).apply()
+                xLabel.text = "Posizione X: ${formatDp(value)} dp"
             })
         }
         root.addView(xSeek, matchWrap())
@@ -173,10 +176,11 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         yLabel = valueLabel("")
         root.addView(yLabel)
         ySeek = SeekBar(this).apply {
-            max = heightDp
-            setOnSeekBarChangeListener(simpleSeekListener { value ->
-                prefs.edit().putFloat(Prefs.KEY_CENTER_Y_DP, value.toFloat()).apply()
-                yLabel.text = "Posizione Y: ${value} dp"
+            max = (heightDp / positionStepDp).roundToInt().coerceAtLeast(1)
+            setOnSeekBarChangeListener(simpleSeekListener { progress ->
+                val value = progressToPositionDp(progress)
+                prefs.edit().putFloat(Prefs.KEY_CENTER_Y_DP, value).apply()
+                yLabel.text = "Posizione Y: ${formatDp(value)} dp"
             })
         }
         root.addView(ySeek, matchWrap())
@@ -278,13 +282,13 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         val diameter = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
         val thickness = prefs.getFloat(Prefs.KEY_THICKNESS_DP, Prefs.DEFAULT_THICKNESS_DP)
 
-        xSeek.progress = x.toInt().coerceIn(0, xSeek.max)
-        ySeek.progress = y.toInt().coerceIn(0, ySeek.max)
+        xSeek.progress = positionToProgress(x).coerceIn(0, xSeek.max)
+        ySeek.progress = positionToProgress(y).coerceIn(0, ySeek.max)
         diameterSeek.progress = (diameter.toInt() - 4).coerceIn(0, diameterSeek.max)
         thicknessSeek.progress = (thickness * 2f - 2f).toInt().coerceIn(0, thicknessSeek.max)
 
-        xLabel.text = "Posizione X: ${x.toInt()} dp"
-        yLabel.text = "Posizione Y: ${y.toInt()} dp"
+        xLabel.text = "Posizione X: ${formatDp(x)} dp"
+        yLabel.text = "Posizione Y: ${formatDp(y)} dp"
         diameterLabel.text = "Diametro anello: ${diameter.toInt()} dp"
         thicknessLabel.text = "Spessore: ${"%.1f".format(thickness)} dp"
 
@@ -325,12 +329,22 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
     }
 
     private fun chooseLikelyCameraRect(rects: List<Rect>, displayWidth: Int): Rect {
-        return rects.minWithOrNull(
-            compareBy<Rect> { it.top }
-                .thenBy { abs(it.exactCenterX() - displayWidth / 2f) }
-                .thenBy { max(it.width(), it.height()) }
-        ) ?: rects.first()
-    }
+        val highestTop = rects.minOf { it.top }
+        val topCandidates = rects.filter { it.top <= highestTop + dp(12) }
+
+        val plausiblePunchHoles = topCandidates.filter {
+            it.width() < displayWidth * 0.35f && it.height() > 0
+        }
+
+    return plausiblePunchHoles.minWithOrNull(
+        compareBy<Rect> { abs(it.exactCenterX() - displayWidth / 2f) }
+            .thenBy { abs(it.width() - it.height()) }
+            .thenBy { max(it.width(), it.height()) }
+    ) ?: topCandidates.minWithOrNull(
+        compareBy<Rect> { abs(it.exactCenterX() - displayWidth / 2f) }
+            .thenBy { max(it.width(), it.height()) }
+    ) ?: rects.first()
+}
 
     private fun applyTypedColor() {
         val raw = colorInput.text.toString().trim()
@@ -398,6 +412,12 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
         override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
     }
+
+    private fun positionToProgress(valueDp: Float): Int = (valueDp / positionStepDp).roundToInt()
+
+    private fun progressToPositionDp(progress: Int): Float = progress * positionStepDp
+
+    private fun formatDp(value: Float): String = String.format("%.2f", value)
 
     private fun matchWrap() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,

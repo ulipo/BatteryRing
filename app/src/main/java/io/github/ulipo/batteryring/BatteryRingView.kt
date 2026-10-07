@@ -40,7 +40,7 @@ class BatteryRingView(context: Context) : View(context) {
         arcBounds.set(cx - radius, cy - radius, cx + radius, cy + radius)
         val sweep = 360f * (batteryPercent / 100f)
         if (sweep > 0f) {
-            canvas.drawArc(arcBounds, -90f, sweep, false, paint)
+            canvas.drawArc(arcBounds, -90f, -sweep, false, paint)
         }
     }
 }
