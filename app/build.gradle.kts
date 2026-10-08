@@ -11,8 +11,8 @@ if (keystorePropertiesFile.exists()) {
 }
 
 fun signingValue(propertyName: String, environmentName: String): String? =
-    keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
-        ?: System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+    System.getenv(environmentName)?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(propertyName)?.takeIf { it.isNotBlank() }
 
 val signingStorePath = signingValue("storeFile", "BATTERYRING_STORE_FILE")
 val signingStorePassword = signingValue("storePassword", "BATTERYRING_STORE_PASSWORD")
