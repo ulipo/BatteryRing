@@ -31,11 +31,50 @@ jobs:
         with:
           gradle-version: "9.6.0"
 
-      - name: Build debug APK
-        run: gradle :app:assembleDebug
+      - name: Check signing secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BATTERYRING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.BATTERYRING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.BATTERYRING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.BATTERYRING_KEY_PASSWORD }}
+        run: |
+          test -n "$KEYSTORE_BASE64" || { echo "Missing BATTERYRING_KEYSTORE_BASE64"; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "Missing BATTERYRING_STORE_PASSWORD"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "Missing BATTERYRING_KEY_ALIAS"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "Missing BATTERYRING_KEY_PASSWORD"; exit 1; }
 
-      - name: Upload APK
+      - name: Restore persistent signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.BATTERYRING_KEYSTORE_BASE64 }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/batteryring-release.jks"
+          chmod 600 "$RUNNER_TEMP/batteryring-release.jks"
+
+      - name: Build signed APKs
+        env:
+          BATTERYRING_STORE_FILE: ${{ runner.temp }}/batteryring-release.jks
+          BATTERYRING_STORE_PASSWORD: ${{ secrets.BATTERYRING_STORE_PASSWORD }}
+          BATTERYRING_KEY_ALIAS: ${{ secrets.BATTERYRING_KEY_ALIAS }}
+          BATTERYRING_KEY_PASSWORD: ${{ secrets.BATTERYRING_KEY_PASSWORD }}
+          BUILD_NUMBER: ${{ github.run_number }}
+          VERSION_NAME: 1.2.${{ github.run_number }}
+        run: gradle :app:assembleDebug :app:assembleRelease
+
+      - name: Collect APKs
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/BatteryRing-${BUILD_NUMBER}-debug.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/BatteryRing-${BUILD_NUMBER}-release.apk"
+
+      - name: Verify signing certificates
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/BatteryRing-${{ github.run_number }}-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/BatteryRing-${{ github.run_number }}-release.apk
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
-          name: BatteryRing-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: BatteryRing-${{ github.run_number }}
+          path: dist/*.apk

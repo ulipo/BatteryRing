@@ -4,4 +4,3 @@
     <string name="accessibility_service_label">BatteryRing overlay</string>
     <string name="accessibility_service_description">Mostra esclusivamente l\'anello della batteria sopra l\'interfaccia di sistema. Non legge il contenuto delle altre app e non intercetta i tocchi.</string>
 </resources>
-

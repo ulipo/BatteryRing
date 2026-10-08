@@ -8,12 +8,13 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.Color
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
+import android.view.Surface
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
@@ -23,16 +24,17 @@ import android.widget.SeekBar
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import kotlin.math.abs
-import kotlin.math.max
 import kotlin.math.roundToInt
 
 class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private val positionStepDp = 0.25f
+    private val maxVerticalPositionDp = 120f
+
     private lateinit var prefs: SharedPreferences
     private lateinit var enabledSwitch: Switch
     private lateinit var serviceStatus: TextView
     private lateinit var batteryStatus: TextView
+    private lateinit var detectionStatus: TextView
     private lateinit var preview: RingPreviewView
     private lateinit var colorInput: EditText
 
@@ -40,12 +42,15 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
     private lateinit var ySeek: SeekBar
     private lateinit var diameterSeek: SeekBar
     private lateinit var thicknessSeek: SeekBar
+    private lateinit var startAngleSeek: SeekBar
     private lateinit var xLabel: TextView
     private lateinit var yLabel: TextView
     private lateinit var diameterLabel: TextView
     private lateinit var thicknessLabel: TextView
+    private lateinit var startAngleLabel: TextView
 
     private var batteryReceiverRegistered = false
+    private var displayWidthDp = 1f
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -54,7 +59,8 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             val scale = intent.getIntExtra("scale", -1)
             if (level >= 0 && scale > 0) {
                 val percent = level * 100f / scale.toFloat()
-                batteryStatus.text = "Batteria: ${percent.toInt()}%  •  arco: ${"%.1f".format(360f * percent / 100f)}°"
+                batteryStatus.text =
+                    "Batteria: ${percent.toInt()}%  •  arco: ${"%.1f".format(360f * percent / 100f)}°"
                 preview.batteryPercent = percent
             }
         }
@@ -96,7 +102,22 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
     }
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
-        preview.invalidate()
+        if (::preview.isInitialized) preview.invalidate()
+
+        when (key) {
+            Prefs.KEY_CENTER_X_DP,
+            Prefs.KEY_CENTER_Y_DP,
+            Prefs.KEY_DIAMETER_DP,
+            Prefs.KEY_THICKNESS_DP,
+            Prefs.KEY_START_ANGLE_DEG,
+            Prefs.KEY_COLOR -> {
+                if (::xSeek.isInitialized) syncControlsFromPrefs()
+            }
+
+            Prefs.KEY_DETECTION_INFO -> {
+                if (::detectionStatus.isInitialized) updateDetectionStatus()
+            }
+        }
     }
 
     private fun buildUi(): ScrollView {
@@ -151,39 +172,50 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         preview = RingPreviewView(this).apply {
             minimumHeight = dp(150)
         }
-        root.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150)).apply {
-            bottomMargin = dp(18)
-        })
+        root.addView(
+            preview,
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150)).apply {
+                bottomMargin = dp(18)
+            }
+        )
 
         root.addView(sectionTitle("Posizione e dimensioni"))
 
-        val display = resources.displayMetrics
-        val widthDp = (display.widthPixels / display.density).toInt().coerceAtLeast(1)
-        val heightDp = (display.heightPixels / display.density).toInt().coerceAtLeast(1)
+        val metrics = resources.displayMetrics
+        @Suppress("DEPRECATION")
+        val rotation = windowManager.defaultDisplay.rotation
+        displayWidthDp = when (rotation) {
+            Surface.ROTATION_90, Surface.ROTATION_270 -> metrics.heightPixels / metrics.density
+            else -> metrics.widthPixels / metrics.density
+        }
 
         xLabel = valueLabel("")
         root.addView(xLabel)
         xSeek = SeekBar(this).apply {
-            max = (widthDp / positionStepDp).roundToInt().coerceAtLeast(1)
+            max = (displayWidthDp / positionStepDp).roundToInt().coerceAtLeast(1)
             setOnSeekBarChangeListener(simpleSeekListener { progress ->
-                val value = progressToPositionDp(progress)
-                prefs.edit().putFloat(Prefs.KEY_CENTER_X_DP, value).apply()
-                xLabel.text = "Posizione X: ${formatDp(value)} dp"
+                setPosition(Prefs.KEY_CENTER_X_DP, progressToPositionDp(progress), true)
             })
         }
         root.addView(xSeek, matchWrap())
+        root.addView(nudgeRow(
+            onMinus = { nudgePosition(Prefs.KEY_CENTER_X_DP, -positionStepDp, 0f, displayWidthDp) },
+            onPlus = { nudgePosition(Prefs.KEY_CENTER_X_DP, positionStepDp, 0f, displayWidthDp) }
+        ))
 
         yLabel = valueLabel("")
         root.addView(yLabel)
         ySeek = SeekBar(this).apply {
-            max = (heightDp / positionStepDp).roundToInt().coerceAtLeast(1)
+            max = (maxVerticalPositionDp / positionStepDp).roundToInt()
             setOnSeekBarChangeListener(simpleSeekListener { progress ->
-                val value = progressToPositionDp(progress)
-                prefs.edit().putFloat(Prefs.KEY_CENTER_Y_DP, value).apply()
-                yLabel.text = "Posizione Y: ${formatDp(value)} dp"
+                setPosition(Prefs.KEY_CENTER_Y_DP, progressToPositionDp(progress), false)
             })
         }
         root.addView(ySeek, matchWrap())
+        root.addView(nudgeRow(
+            onMinus = { nudgePosition(Prefs.KEY_CENTER_Y_DP, -positionStepDp, 0f, maxVerticalPositionDp) },
+            onPlus = { nudgePosition(Prefs.KEY_CENTER_Y_DP, positionStepDp, 0f, maxVerticalPositionDp) }
+        ))
 
         diameterLabel = valueLabel("")
         root.addView(diameterLabel)
@@ -192,7 +224,6 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             setOnSeekBarChangeListener(simpleSeekListener { raw ->
                 val value = raw + 4
                 prefs.edit().putFloat(Prefs.KEY_DIAMETER_DP, value.toFloat()).apply()
-                diameterLabel.text = "Diametro anello: ${value} dp"
             })
         }
         root.addView(diameterSeek, matchWrap())
@@ -204,18 +235,39 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             setOnSeekBarChangeListener(simpleSeekListener { raw ->
                 val value = (raw + 2) / 2f
                 prefs.edit().putFloat(Prefs.KEY_THICKNESS_DP, value).apply()
-                thicknessLabel.text = "Spessore: ${"%.1f".format(value)} dp"
             })
         }
         root.addView(thicknessSeek, matchWrap())
 
+        startAngleLabel = valueLabel("")
+        root.addView(startAngleLabel)
+        startAngleSeek = SeekBar(this).apply {
+            max = 359
+            setOnSeekBarChangeListener(simpleSeekListener { degrees ->
+                prefs.edit().putFloat(Prefs.KEY_START_ANGLE_DEG, degrees.toFloat()).apply()
+            })
+        }
+        root.addView(startAngleSeek, matchWrap())
+
+        root.addView(TextView(this).apply {
+            text = "Origine: 0° = ore 12, 90° = ore 3, 180° = ore 6, 270° = ore 9. L'arco procede in senso antiorario."
+            textSize = 13f
+            setPadding(0, 0, 0, dp(8))
+        })
+
         root.addView(Button(this).apply {
             text = "Rileva automaticamente il foro"
-            setOnClickListener { detectCameraCutout() }
+            setOnClickListener { requestCameraCutoutDetection() }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
             topMargin = dp(8)
-            bottomMargin = dp(18)
         })
+
+        detectionStatus = TextView(this).apply {
+            textSize = 12f
+            setPadding(dp(8), dp(8), dp(8), dp(18))
+            setTextIsSelectable(true)
+        }
+        root.addView(detectionStatus, matchWrap())
 
         root.addView(sectionTitle("Colore"))
         val colorRow = LinearLayout(this).apply {
@@ -242,6 +294,7 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             setPadding(0, dp(8), 0, dp(14))
         }
         val presetColors = listOf(
+            Color.WHITE,
             Color.rgb(0, 230, 118),
             Color.CYAN,
             Color.YELLOW,
@@ -256,8 +309,6 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
                 setTextColor(color)
                 setOnClickListener {
                     prefs.edit().putInt(Prefs.KEY_COLOR, color).apply()
-                    colorInput.setText(String.format("#%06X", 0xFFFFFF and color))
-                    preview.invalidate()
                 }
             }, LinearLayout.LayoutParams(0, dp(52), 1f))
         }
@@ -277,74 +328,96 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         val defaultX = resources.displayMetrics.widthPixels / density / 2f
         enabledSwitch.isChecked = prefs.getBoolean(Prefs.KEY_ENABLED, true)
 
-        val x = prefs.getFloat(Prefs.KEY_CENTER_X_DP, defaultX)
-        val y = prefs.getFloat(Prefs.KEY_CENTER_Y_DP, 16f)
+        val x = prefs.getFloat(Prefs.KEY_CENTER_X_DP, defaultX).coerceIn(0f, displayWidthDp)
+        val y = prefs.getFloat(Prefs.KEY_CENTER_Y_DP, 16f).coerceIn(0f, maxVerticalPositionDp)
         val diameter = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
         val thickness = prefs.getFloat(Prefs.KEY_THICKNESS_DP, Prefs.DEFAULT_THICKNESS_DP)
+        val startAngle = prefs.getFloat(
+            Prefs.KEY_START_ANGLE_DEG,
+            Prefs.DEFAULT_START_ANGLE_DEG
+        ).coerceIn(0f, 359f)
 
         xSeek.progress = positionToProgress(x).coerceIn(0, xSeek.max)
         ySeek.progress = positionToProgress(y).coerceIn(0, ySeek.max)
-        diameterSeek.progress = (diameter.toInt() - 4).coerceIn(0, diameterSeek.max)
-        thicknessSeek.progress = (thickness * 2f - 2f).toInt().coerceIn(0, thicknessSeek.max)
+        diameterSeek.progress = (diameter.roundToInt() - 4).coerceIn(0, diameterSeek.max)
+        thicknessSeek.progress = (thickness * 2f - 2f).roundToInt().coerceIn(0, thicknessSeek.max)
+        startAngleSeek.progress = startAngle.roundToInt().coerceIn(0, startAngleSeek.max)
 
         xLabel.text = "Posizione X: ${formatDp(x)} dp"
-        yLabel.text = "Posizione Y: ${formatDp(y)} dp"
-        diameterLabel.text = "Diametro anello: ${diameter.toInt()} dp"
+        yLabel.text = "Posizione Y: ${formatDp(y)} dp (0–${maxVerticalPositionDp.toInt()})"
+        diameterLabel.text = "Diametro anello: ${diameter.roundToInt()} dp"
         thicknessLabel.text = "Spessore: ${"%.1f".format(thickness)} dp"
+        startAngleLabel.text = "Origine arco: ${startAngle.roundToInt()}° ${angleClockLabel(startAngle)}"
 
         val color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
         colorInput.setText(String.format("#%06X", 0xFFFFFF and color))
+        updateDetectionStatus()
         preview.invalidate()
     }
 
-    private fun detectCameraCutout() {
+    private fun requestCameraCutoutDetection() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
             toast("Il rilevamento automatico richiede Android 9 o successivo.")
             return
         }
-
-        val cutout = window.decorView.rootWindowInsets?.displayCutout
-        val rects = cutout?.boundingRects.orEmpty()
-        if (rects.isEmpty()) {
-            toast("Android non espone un DisplayCutout su questo dispositivo. Usa gli slider per la calibrazione manuale.")
+        if (!isAccessibilityServiceEnabled()) {
+            toast("Abilita prima il servizio di accessibilità BatteryRing.")
+            return
+        }
+        if (!prefs.getBoolean(Prefs.KEY_ENABLED, true)) {
+            toast("Attiva prima l'indicatore: il rilevamento usa la finestra dell'overlay.")
             return
         }
 
-        val width = resources.displayMetrics.widthPixels
-        val target = chooseLikelyCameraRect(rects, width)
-        val density = resources.displayMetrics.density
-        val centerXdp = target.exactCenterX() / density
-        val centerYdp = target.exactCenterY() / density
-        val detectedDiameterDp = max(target.width(), target.height()) / density
-        val ringDiameterDp = (detectedDiameterDp + 2.5f).coerceIn(4f, 80f)
-
+        detectionStatus.text = "Rilevamento richiesto all'overlay…"
         prefs.edit()
-            .putFloat(Prefs.KEY_CENTER_X_DP, centerXdp)
-            .putFloat(Prefs.KEY_CENTER_Y_DP, centerYdp)
-            .putFloat(Prefs.KEY_DIAMETER_DP, ringDiameterDp)
+            .putLong(Prefs.KEY_DETECT_REQUEST_ID, SystemClock.elapsedRealtimeNanos())
             .apply()
-
-        syncControlsFromPrefs()
-        toast("Foro rilevato. Regola gli slider se l'anello non è perfettamente centrato.")
     }
 
-    private fun chooseLikelyCameraRect(rects: List<Rect>, displayWidth: Int): Rect {
-        val highestTop = rects.minOf { it.top }
-        val topCandidates = rects.filter { it.top <= highestTop + dp(12) }
+    private fun updateDetectionStatus() {
+        val info = prefs.getString(Prefs.KEY_DETECTION_INFO, null)
+        detectionStatus.text = info ?: "Nessun rilevamento automatico eseguito."
+    }
 
-        val plausiblePunchHoles = topCandidates.filter {
-            it.width() < displayWidth * 0.35f && it.height() > 0
+    private fun setPosition(key: String, value: Float, horizontal: Boolean) {
+        val max = if (horizontal) displayWidthDp else maxVerticalPositionDp
+        prefs.edit().putFloat(key, value.coerceIn(0f, max)).apply()
+    }
+
+    private fun nudgePosition(key: String, delta: Float, min: Float, max: Float) {
+        val default = if (key == Prefs.KEY_CENTER_X_DP) displayWidthDp / 2f else 16f
+        val value = (prefs.getFloat(key, default) + delta).coerceIn(min, max)
+        prefs.edit().putFloat(key, value).apply()
+    }
+
+    private fun nudgeRow(onMinus: () -> Unit, onPlus: () -> Unit): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(0, 0, 0, dp(4))
+            addView(Button(this@MainActivity).apply {
+                text = "−0,25 dp"
+                setOnClickListener { onMinus() }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(4)
+            })
+            addView(Button(this@MainActivity).apply {
+                text = "+0,25 dp"
+                setOnClickListener { onPlus() }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(4)
+            })
         }
+    }
 
-    return plausiblePunchHoles.minWithOrNull(
-        compareBy<Rect> { abs(it.exactCenterX() - displayWidth / 2f) }
-            .thenBy { abs(it.width() - it.height()) }
-            .thenBy { max(it.width(), it.height()) }
-    ) ?: topCandidates.minWithOrNull(
-        compareBy<Rect> { abs(it.exactCenterX() - displayWidth / 2f) }
-            .thenBy { max(it.width(), it.height()) }
-    ) ?: rects.first()
-}
+    private fun angleClockLabel(degrees: Float): String = when (degrees.roundToInt()) {
+        0 -> "(ore 12)"
+        90 -> "(ore 3)"
+        180 -> "(ore 6)"
+        270 -> "(ore 9)"
+        else -> ""
+    }
 
     private fun applyTypedColor() {
         val raw = colorInput.text.toString().trim()
@@ -352,8 +425,6 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             val normalized = if (raw.startsWith("#")) raw else "#$raw"
             val color = Color.parseColor(normalized)
             prefs.edit().putInt(Prefs.KEY_COLOR, color).apply()
-            colorInput.setText(String.format("#%06X", 0xFFFFFF and color))
-            preview.invalidate()
         } catch (_: IllegalArgumentException) {
             toast("Colore non valido. Usa il formato #RRGGBB, ad esempio #00E676.")
         }
@@ -366,7 +437,9 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         } else {
             "Servizio Accessibilità: DISATTIVATO — abilitalo per mostrare l'anello sopra la barra di stato"
         }
-        serviceStatus.setTextColor(if (enabled) Color.rgb(0, 120, 70) else Color.rgb(180, 45, 45))
+        serviceStatus.setTextColor(
+            if (enabled) Color.rgb(0, 120, 70) else Color.rgb(180, 45, 45)
+        )
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -405,17 +478,21 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         setPadding(0, dp(7), 0, 0)
     }
 
-    private fun simpleSeekListener(onChanged: (Int) -> Unit) = object : SeekBar.OnSeekBarChangeListener {
-        override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-            if (fromUser) onChanged(progress)
+    private fun simpleSeekListener(onChanged: (Int) -> Unit) =
+        object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) onChanged(progress)
+            }
+
+            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
         }
-        override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-        override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-    }
 
-    private fun positionToProgress(valueDp: Float): Int = (valueDp / positionStepDp).roundToInt()
+    private fun positionToProgress(valueDp: Float): Int =
+        (valueDp / positionStepDp).roundToInt()
 
-    private fun progressToPositionDp(progress: Int): Float = progress * positionStepDp
+    private fun progressToPositionDp(progress: Int): Float =
+        progress * positionStepDp
 
     private fun formatDp(value: Float): String = String.format("%.2f", value)
 
@@ -424,7 +501,8 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         ViewGroup.LayoutParams.WRAP_CONTENT
     )
 
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
+    private fun dp(value: Int): Int =
+        (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }

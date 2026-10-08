@@ -59,3 +59,19 @@ L'uso di un `AccessibilityService` per una funzione non strettamente assistiva p
 ## Limitazioni
 
 La gestione della sovrapposizione alle finestre di sistema può avere differenze tra firmware OEM. `TYPE_ACCESSIBILITY_OVERLAY` è la strada pubblica più adatta per questo caso, ma alcuni produttori possono introdurre comportamenti propri. La calibrazione manuale serve anche a compensare queste differenze.
+
+## Changes in 1.1
+
+- Battery arc now runs counter-clockwise.
+- Arc origin is configurable from 0° to 359° (0° = 12 o'clock).
+- X/Y calibration uses 0.25 dp steps with fine-adjustment buttons.
+- Vertical calibration is limited to the upper 120 dp of the screen.
+- White is available as a preset color.
+- Automatic punch-hole detection is performed from the accessibility overlay itself, so detection and drawing share the same coordinate system. Diagnostic cutout values are shown in the app.
+- GitHub Actions can sign every debug/release artifact with one persistent BatteryRing certificate. See `SIGNING.md`.
+
+## Changes in 1.2
+
+### Screen rotation
+
+The camera centre is stored in the display's natural coordinate system. The overlay transforms that point for `ROTATION_0`, `ROTATION_90`, `ROTATION_180` and `ROTATION_270`, so a portrait calibration follows the same physical punch-hole when the device rotates. The accessibility overlay is recreated on configuration changes to pick up the new full-screen bounds and cutout geometry.
