@@ -4,7 +4,6 @@ package io.github.ulipo.batteryring
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
@@ -28,7 +27,7 @@ class RingPreviewView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        canvas.drawColor(Color.rgb(24, 26, 31))
+        canvas.drawColor(NordPalette.Nord0)
 
         val density = resources.displayMetrics.density
         val diameterDp = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
@@ -62,8 +61,12 @@ class RingPreviewView(context: Context) : View(context) {
             canvas.drawArc(bounds, originDeg - 90f, -sweep, true, fillPaint)
         }
 
-        if (borderWidth > 0f) {
-            canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
+        if (borderWidth > 0f && sweep > 0f) {
+            if (sweep >= 360f) {
+                canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
+            } else {
+                canvas.drawArc(bounds, originDeg - 90f, -sweep, false, borderPaint)
+            }
         }
     }
 }

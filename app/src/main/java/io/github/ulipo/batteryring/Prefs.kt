@@ -4,7 +4,6 @@ package io.github.ulipo.batteryring
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.Color
 
 object Prefs {
     const val FILE = "battery_ring_preferences"
@@ -24,8 +23,8 @@ object Prefs {
     const val DEFAULT_DIAMETER_DP = 13f
     const val DEFAULT_START_ANGLE_DEG = 0f
     const val DEFAULT_BORDER_THICKNESS_DP = 0f
-    val DEFAULT_COLOR: Int = Color.rgb(0, 230, 118)
-    val DEFAULT_BORDER_COLOR: Int = Color.WHITE
+    val DEFAULT_COLOR: Int = NordPalette.Nord14
+    val DEFAULT_BORDER_COLOR: Int = NordPalette.Nord6
 
     fun get(context: Context): SharedPreferences =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)

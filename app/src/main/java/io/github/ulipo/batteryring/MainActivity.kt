@@ -14,7 +14,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
 import android.provider.Settings
-import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -24,12 +23,11 @@ import android.widget.ScrollView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.textview.MaterialTextView
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -50,8 +48,10 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private lateinit var batteryStatus: MaterialTextView
     private lateinit var detectionStatus: MaterialTextView
     private lateinit var preview: RingPreviewView
-    private lateinit var fillColorInput: TextInputEditText
-    private lateinit var borderColorInput: TextInputEditText
+    private lateinit var fillColorValue: MaterialTextView
+    private lateinit var borderColorValue: MaterialTextView
+    private lateinit var fillColorSwatch: MaterialCardView
+    private lateinit var borderColorSwatch: MaterialCardView
 
     private lateinit var xSlider: Slider
     private lateinit var ySlider: Slider
@@ -136,10 +136,14 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun buildUi(): View {
         naturalWidthDp = naturalDisplayWidthDp().coerceAtLeast(1f)
 
-        val scroll = ScrollView(this).apply { isFillViewport = true }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            setBackgroundColor(NordPalette.Nord0)
+        }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(16), dp(12), dp(16), dp(24))
+            setBackgroundColor(NordPalette.Nord0)
         }
         scroll.addView(
             root,
@@ -152,6 +156,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         root.addView(MaterialToolbar(this).apply {
             title = "BatteryRing"
             subtitle = "Indicatore batteria attorno alla fotocamera"
+            setBackgroundColor(NordPalette.Nord0)
+            setTitleTextColor(NordPalette.Nord6)
+            setSubtitleTextColor(NordPalette.Nord4)
         }, matchWrap())
 
         serviceStatus = supportingText("")
@@ -287,16 +294,20 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         root.addView(colorCard(
             title = "Riempimento",
-            hint = "#00E676",
             prefKey = Prefs.KEY_COLOR,
-            onInputReady = { fillColorInput = it }
+            onReady = { swatch, value ->
+                fillColorSwatch = swatch
+                fillColorValue = value
+            }
         ), cardParams())
 
         root.addView(colorCard(
             title = "Bordo",
-            hint = "#FFFFFF",
             prefKey = Prefs.KEY_BORDER_COLOR,
-            onInputReady = { borderColorInput = it }
+            onReady = { swatch, value ->
+                borderColorSwatch = swatch
+                borderColorValue = value
+            }
         ), cardParams())
 
         root.addView(sectionCard("Informazioni") {
@@ -316,6 +327,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             addView(MaterialTextView(context).apply {
                 text = title
                 textSize = 20f
+                setTextColor(NordPalette.Nord6)
                 setPadding(0, 0, 0, dp(12))
             })
             contentBuilder()
@@ -323,7 +335,10 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
         return MaterialCardView(this).apply {
             radius = dp(22).toFloat()
-            cardElevation = dp(1).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = NordPalette.Nord3
+            setCardBackgroundColor(NordPalette.Nord1)
             setContentPadding(dp(16), dp(16), dp(16), dp(16))
             addView(content, matchWrap())
         }
@@ -331,46 +346,55 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
     private fun colorCard(
         title: String,
-        hint: String,
         prefKey: String,
-        onInputReady: (TextInputEditText) -> Unit
+        onReady: (MaterialCardView, MaterialTextView) -> Unit
     ): MaterialCardView {
         val presetColors = listOf(
             Color.WHITE,
-            Color.rgb(0, 230, 118),
-            Color.CYAN,
-            Color.YELLOW,
-            Color.rgb(255, 145, 0),
-            Color.RED,
-            Color.MAGENTA
+            NordPalette.Nord14,
+            NordPalette.Nord8,
+            NordPalette.Nord13,
+            NordPalette.Nord12,
+            NordPalette.Nord11,
+            NordPalette.Nord15
         )
 
         return sectionCard(title) {
+            val current = prefs.getInt(
+                prefKey,
+                if (prefKey == Prefs.KEY_COLOR) Prefs.DEFAULT_COLOR else Prefs.DEFAULT_BORDER_COLOR
+            )
+
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
             }
-            val layout = TextInputLayout(context).apply { this.hint = hint }
-            val editText = TextInputEditText(context).apply {
-                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-                setSingleLine(true)
+
+            val swatch = MaterialCardView(context).apply {
+                radius = dp(22).toFloat()
+                cardElevation = 0f
+                strokeWidth = dp(1)
+                strokeColor = NordPalette.Nord3
+                setCardBackgroundColor(current)
             }
-            layout.addView(
-                editText,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            )
-            onInputReady(editText)
-            row.addView(layout, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(swatch, LinearLayout.LayoutParams(dp(44), dp(44)).apply {
+                marginEnd = dp(12)
+            })
+
+            val valueText = MaterialTextView(context).apply {
+                text = colorHex(current)
+                textSize = 16f
+                setTextColor(NordPalette.Nord5)
+            }
+            row.addView(valueText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+
             row.addView(MaterialButton(context).apply {
-                text = "Applica"
-                setOnClickListener { applyTypedColor(editText, prefKey) }
-            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                marginStart = dp(8)
+                text = "Scegli colore"
+                setOnClickListener { showColorPicker(title, prefKey) }
             })
             addView(row, matchWrap())
+
+            onReady(swatch, valueText)
 
             val scroller = HorizontalScrollView(context).apply {
                 isHorizontalScrollBarEnabled = false
@@ -389,7 +413,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                     insetBottom = 0
                     cornerRadius = dp(20)
                     strokeWidth = dp(1)
-                    strokeColor = ColorStateList.valueOf(Color.argb(100, 0, 0, 0))
+                    strokeColor = ColorStateList.valueOf(NordPalette.Nord3)
                     backgroundTintList = ColorStateList.valueOf(color)
                     setOnClickListener { prefs.edit().putInt(prefKey, color).apply() }
                 }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(8) })
@@ -403,6 +427,46 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             )
             addView(scroller, matchWrap())
         }
+    }
+
+    private fun showColorPicker(title: String, prefKey: String) {
+        val current = prefs.getInt(
+            prefKey,
+            if (prefKey == Prefs.KEY_COLOR) Prefs.DEFAULT_COLOR else Prefs.DEFAULT_BORDER_COLOR
+        )
+        val picker = NordColorPickerView(this).apply {
+            setColor(current)
+        }
+        val valueLabel = MaterialTextView(this).apply {
+            text = colorHex(current)
+            textSize = 16f
+            gravity = Gravity.CENTER
+            setTextColor(NordPalette.Nord5)
+            setPadding(0, dp(8), 0, 0)
+        }
+        picker.onColorChanged = { color -> valueLabel.text = colorHex(color) }
+
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(8), 0, dp(8), 0)
+            addView(
+                picker,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(300)
+                )
+            )
+            addView(valueLabel, matchWrap())
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Colore $title")
+            .setView(content)
+            .setNegativeButton("Annulla", null)
+            .setPositiveButton("Applica") { _, _ ->
+                prefs.edit().putInt(prefKey, picker.selectedColor).apply()
+            }
+            .show()
     }
 
     private fun syncControlsFromPrefs() {
@@ -441,13 +505,15 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             startAngleLabel.text = "Origine settore: ${startAngle.roundToInt()}° ${angleClockLabel(startAngle)}"
         }
 
-        if (::fillColorInput.isInitialized) {
+        if (::fillColorValue.isInitialized) {
             val fillColor = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
-            fillColorInput.setText(String.format("#%06X", 0xFFFFFF and fillColor))
+            fillColorValue.text = colorHex(fillColor)
+            fillColorSwatch.setCardBackgroundColor(fillColor)
         }
-        if (::borderColorInput.isInitialized) {
+        if (::borderColorValue.isInitialized) {
             val borderColor = prefs.getInt(Prefs.KEY_BORDER_COLOR, Prefs.DEFAULT_BORDER_COLOR)
-            borderColorInput.setText(String.format("#%06X", 0xFFFFFF and borderColor))
+            borderColorValue.text = colorHex(borderColor)
+            borderColorSwatch.setCardBackgroundColor(borderColor)
         }
 
         updateDetectionStatus()
@@ -522,17 +588,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         prefs.edit().putFloat(Prefs.KEY_START_ANGLE_DEG, value).apply()
     }
 
-    private fun applyTypedColor(input: TextInputEditText, key: String) {
-        val raw = input.text?.toString()?.trim().orEmpty()
-        try {
-            val normalized = if (raw.startsWith("#")) raw else "#$raw"
-            val color = Color.parseColor(normalized)
-            prefs.edit().putInt(key, color).apply()
-        } catch (_: IllegalArgumentException) {
-            toast("Colore non valido. Usa il formato #RRGGBB, ad esempio #00E676.")
-        }
-    }
-
     private fun updateServiceStatus() {
         val enabled = isAccessibilityServiceEnabled()
         serviceStatus.text = if (enabled) {
@@ -540,6 +595,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         } else {
             "Servizio Accessibilità: DISATTIVATO — abilitalo per mostrare l'indicatore sopra la barra di stato"
         }
+        serviceStatus.setTextColor(if (enabled) NordPalette.Nord14 else NordPalette.Nord11)
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -568,16 +624,19 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun bodyText(text: String) = MaterialTextView(this).apply {
         this.text = text
         textSize = 16f
+        setTextColor(NordPalette.Nord5)
     }
 
     private fun supportingText(text: String) = MaterialTextView(this).apply {
         this.text = text
         textSize = 14f
+        setTextColor(NordPalette.Nord4)
     }
 
     private fun labelText(text: String) = MaterialTextView(this).apply {
         this.text = text
         textSize = 15f
+        setTextColor(NordPalette.Nord5)
         setPadding(0, dp(8), 0, dp(4))
     }
 
@@ -622,6 +681,8 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         val metrics = resources.displayMetrics
         return min(metrics.widthPixels, metrics.heightPixels) / metrics.density
     }
+
+    private fun colorHex(color: Int): String = String.format("#%06X", 0xFFFFFF and color)
 
     private fun formatDp(value: Float): String = String.format("%.2f", value)
 

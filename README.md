@@ -10,6 +10,7 @@ BatteryRing mostra un settore circolare colorato sopra il foro della fotocamera 
 - L'overlay è `NOT_TOUCHABLE` e `NOT_FOCUSABLE`: non intercetta tocchi né focus.
 - Aggiornamento della batteria tramite `ACTION_BATTERY_CHANGED`, senza polling continuo.
 - Posizione X/Y, diametro, colore di riempimento, colore/spessore del bordo e origine del settore configurabili in tempo reale.
+- Interfaccia Material 3 con palette Nord dark.
 - Rilevamento automatico del `DisplayCutout` quando il dispositivo lo espone.
 - Persistenza delle impostazioni con `SharedPreferences`.
 - Nessuna notifica permanente: il ciclo di vita dell'overlay è gestito dal servizio di accessibilità.
@@ -22,9 +23,9 @@ BatteryRing mostra un settore circolare colorato sopra il foro della fotocamera 
 4. Torna nell'app.
 5. Prova **Rileva automaticamente il foro**.
 6. Se necessario, correggi X/Y, diametro e spessore con gli slider.
-7. Scegli il colore con i preset o inserendo `#RRGGBB`.
+7. Scegli il colore con il color picker HSV oppure con i preset rapidi.
 
-L'anello resta attivo quando la Activity viene chiusa, finché il servizio di accessibilità rimane abilitato e l'interruttore **Indicatore attivo** è acceso.
+L'indicatore resta attivo quando la Activity viene chiusa, finché il servizio di accessibilità rimane abilitato e l'interruttore **Indicatore attivo** è acceso.
 
 ## Build con GitHub Actions
 
@@ -68,7 +69,7 @@ La gestione della sovrapposizione alle finestre di sistema può avere differenze
 - Vertical calibration is limited to the upper 120 dp of the screen.
 - White is available as a preset color.
 - Automatic punch-hole detection is performed from the accessibility overlay itself, so detection and drawing share the same coordinate system. Diagnostic cutout values are shown in the app.
-- GitHub Actions can sign every debug/release artifact with one persistent BatteryRing certificate. See `SIGNING.md`.
+- GitHub Actions firma la build release con un certificato BatteryRing persistente. Vedi `SIGNING.md`.
 
 ## Changes in 1.2
 

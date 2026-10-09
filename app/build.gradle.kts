@@ -33,8 +33,8 @@ android {
         applicationId = "io.github.ulipo.batteryring"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 7
-        versionName = System.getenv("VERSION_NAME") ?: "1.4.4"
+        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 8
+        versionName = System.getenv("VERSION_NAME") ?: "1.5.0"
     }
 
     signingConfigs {
@@ -80,7 +80,7 @@ android {
 dependencies {
     implementation("androidx.core:core-ktx:1.16.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("com.google.android.material:material:1.12.0")
+    implementation("com.google.android.material:material:1.14.0")
 }
 
 if (System.getenv("CI") == "true" && !signingConfigured) {

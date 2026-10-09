@@ -75,8 +75,12 @@ class BatteryRingView(context: Context) : View(context) {
             canvas.drawArc(arcBounds, originDeg - 90f, -sweep, true, fillPaint)
         }
 
-        if (borderWidthPx > 0f) {
-            canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
+        if (borderWidthPx > 0f && sweep > 0f) {
+            if (sweep >= 360f) {
+                canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
+            } else {
+                canvas.drawArc(arcBounds, originDeg - 90f, -sweep, false, borderPaint)
+            }
         }
     }
 

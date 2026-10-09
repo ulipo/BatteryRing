@@ -1,12 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.BatteryRing" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.BatteryRing" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:navigationBarColor">#111318</item>
-        <item name="android:statusBarColor">#111318</item>
-        <item name="android:windowBackground">#111318</item>
-        <item name="colorPrimary">#00C853</item>
-        <item name="colorSecondary">#7CFFB2</item>
-        <item name="colorTertiary">#00BCD4</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:statusBarColor">@color/nord0</item>
+        <item name="android:navigationBarColor">@color/nord0</item>
+        <item name="android:windowBackground">@color/nord0</item>
+        <item name="android:colorBackground">@color/nord0</item>
+
+        <item name="colorPrimary">@color/nord8</item>
+        <item name="colorOnPrimary">@color/nord0</item>
+        <item name="colorPrimaryContainer">@color/nord10</item>
+        <item name="colorOnPrimaryContainer">@color/nord6</item>
+        <item name="colorSecondary">@color/nord9</item>
+        <item name="colorOnSecondary">@color/nord0</item>
+        <item name="colorTertiary">@color/nord14</item>
+        <item name="colorOnTertiary">@color/nord0</item>
+        <item name="colorSurface">@color/nord1</item>
+        <item name="colorOnSurface">@color/nord6</item>
+        <item name="colorSurfaceVariant">@color/nord2</item>
+        <item name="colorOnSurfaceVariant">@color/nord4</item>
+        <item name="colorOutline">@color/nord3</item>
+        <item name="colorError">@color/nord11</item>
+        <item name="colorOnError">@color/nord6</item>
     </style>
 </resources>
