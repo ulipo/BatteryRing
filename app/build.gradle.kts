@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    kotlin("android") version "2.2.20"
 }
 
 val keystoreProperties = Properties()
@@ -35,7 +34,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 4
-        versionName = System.getenv("VERSION_NAME") ?: "1.4.0"
+        versionName = System.getenv("VERSION_NAME") ?: "1.4.1"
     }
 
     signingConfigs {
@@ -71,10 +70,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
     }
 
     buildFeatures {
