@@ -1,6 +1,6 @@
 # BatteryRing
 
-BatteryRing mostra un arco colorato attorno alla fotocamera frontale. La lunghezza dell'arco è continua e direttamente proporzionale alla percentuale di batteria: 100% = 360°, 50% = 180°, 1% = 3,6°.
+BatteryRing mostra un settore circolare colorato sopra il foro della fotocamera frontale. L'ampiezza del settore è continua e direttamente proporzionale alla percentuale di batteria: 100% = 360°, 50% = 180°, 1% = 3,6°. Il cerchio può avere un bordo di colore e spessore configurabili; con spessore 0 il bordo è disattivato.
 
 ## Funzioni
 
@@ -9,7 +9,7 @@ BatteryRing mostra un arco colorato attorno alla fotocamera frontale. La lunghez
 - Il servizio di accessibilità non legge il contenuto delle finestre (`canRetrieveWindowContent=false`) e ignora gli eventi ricevuti.
 - L'overlay è `NOT_TOUCHABLE` e `NOT_FOCUSABLE`: non intercetta tocchi né focus.
 - Aggiornamento della batteria tramite `ACTION_BATTERY_CHANGED`, senza polling continuo.
-- Posizione X/Y, diametro, spessore e colore configurabili in tempo reale.
+- Posizione X/Y, diametro, colore di riempimento, colore/spessore del bordo e origine del settore configurabili in tempo reale.
 - Rilevamento automatico del `DisplayCutout` quando il dispositivo lo espone.
 - Persistenza delle impostazioni con `SharedPreferences`.
 - Nessuna notifica permanente: il ciclo di vita dell'overlay è gestito dal servizio di accessibilità.
@@ -28,28 +28,28 @@ L'anello resta attivo quando la Activity viene chiusa, finché il servizio di ac
 
 ## Build con GitHub Actions
 
-Il workflow `.github/workflows/android-build.yml` compila automaticamente l'APK debug. Dopo un push su GitHub:
+Il workflow `.github/workflows/android-build.yml` compila e firma soltanto l'APK **release**. Dopo un push su GitHub:
 
 1. apri la scheda **Actions**;
 2. scegli **Android build**;
 3. apri il job completato;
-4. scarica l'artifact **BatteryRing-debug**.
+4. scarica l'artifact `BatteryRing-<build>`.
 
-L'APK si trova anche localmente in `app/build/outputs/apk/debug/app-debug.apk` dopo `gradle :app:assembleDebug`.
+L'APK prodotto è `BatteryRing-<build>-release.apk`. La firma persistente è descritta in `SIGNING.md`.
 
 ## Build locale
 
 Requisiti:
 
 - JDK 17
-- Android SDK Platform 37
+- Android SDK Platform 36
 - Android Build Tools 36.0.0
 - Gradle 9.6.0
 
 Esegui:
 
 ```bash
-gradle :app:assembleDebug
+gradle :app:assembleRelease
 ```
 
 ## Nota sugli store
@@ -75,3 +75,7 @@ La gestione della sovrapposizione alle finestre di sistema può avere differenze
 ### Screen rotation
 
 The camera centre is stored in the display's natural coordinate system. The overlay transforms that point for `ROTATION_0`, `ROTATION_90`, `ROTATION_180` and `ROTATION_270`, so a portrait calibration follows the same physical punch-hole when the device rotates. The accessibility overlay is recreated on configuration changes to pick up the new full-screen bounds and cutout geometry.
+
+## Licenza
+
+BatteryRing è distribuito secondo la **GNU General Public License v3.0 o successiva** (`GPL-3.0-or-later`). Vedi `LICENSE`.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
 package io.github.ulipo.batteryring
 
 import android.content.BroadcastReceiver
@@ -379,8 +381,6 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                     minimumHeight = 0
                     insetTop = 0
                     insetBottom = 0
-                    insetLeft = 0
-                    insetRight = 0
                     cornerRadius = dp(20)
                     strokeWidth = dp(1)
                     strokeColor = ColorStateList.valueOf(Color.argb(100, 0, 0, 0))
