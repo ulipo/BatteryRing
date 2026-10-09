@@ -279,9 +279,10 @@ class BatteryRingAccessibilityService : AccessibilityService(),
         currentWidth: Float,
         currentHeight: Float
     ): Pair<Float, Float> = when (rotation) {
-        Surface.ROTATION_90 -> Pair(y, currentWidth - x)
+        // Inverse of BatteryRingView.naturalToCurrentPoint().
+        Surface.ROTATION_90 -> Pair(currentHeight - y, x)
         Surface.ROTATION_180 -> Pair(currentWidth - x, currentHeight - y)
-        Surface.ROTATION_270 -> Pair(currentHeight - y, x)
+        Surface.ROTATION_270 -> Pair(y, currentWidth - x)
         else -> Pair(x, y)
     }
 

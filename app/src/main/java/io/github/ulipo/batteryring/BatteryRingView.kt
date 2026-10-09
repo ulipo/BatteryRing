@@ -70,9 +70,12 @@ class BatteryRingView(context: Context) : View(context) {
         currentWidth: Float,
         currentHeight: Float
     ): Pair<Float, Float> = when (rotation) {
-        Surface.ROTATION_90 -> Pair(currentWidth - y, x)
+        // Display.getRotation() is the rotation applied to the drawn graphics,
+        // opposite to the device's physical rotation. Map the physical point
+        // accordingly so the ring follows the same hardware cutout.
+        Surface.ROTATION_90 -> Pair(y, currentHeight - x)
         Surface.ROTATION_180 -> Pair(currentWidth - x, currentHeight - y)
-        Surface.ROTATION_270 -> Pair(y, currentHeight - x)
+        Surface.ROTATION_270 -> Pair(currentWidth - y, x)
         else -> Pair(x, y)
     }
 }
