@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.BatteryRing" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:fontFamily">sans</item>
-        <item name="android:windowActionModeOverlay">true</item>
+    <style name="Theme.BatteryRing" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
         <item name="android:navigationBarColor">#111318</item>
         <item name="android:statusBarColor">#111318</item>
-        <item name="android:windowLightStatusBar">false</item>
-        <item name="android:colorAccent">#00C853</item>
+        <item name="android:windowBackground">#111318</item>
+        <item name="colorPrimary">#00C853</item>
+        <item name="colorSecondary">#7CFFB2</item>
+        <item name="colorTertiary">#00BCD4</item>
     </style>
 </resources>

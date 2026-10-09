@@ -2,6 +2,7 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
+    kotlin("android") version "2.2.20"
 }
 
 val keystoreProperties = Properties()
@@ -33,8 +34,8 @@ android {
         applicationId = "io.github.ulipo.batteryring"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 3
-        versionName = System.getenv("VERSION_NAME") ?: "1.2.0"
+        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 4
+        versionName = System.getenv("VERSION_NAME") ?: "1.4.0"
     }
 
     signingConfigs {
@@ -50,8 +51,6 @@ android {
 
     buildTypes {
         debug {
-            // When the persistent BatteryRing key is configured, debug and release
-            // APKs use the same certificate and can update one another.
             if (signingConfigured) {
                 signingConfig = signingConfigs.getByName("batteryRing")
             }
@@ -73,12 +72,22 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    buildFeatures {
+        buildConfig = true
+    }
 }
 
-// CI must never silently publish an APK signed with a transient runner key.
-// Local unsigned/default-debug builds remain possible until the user creates
-// keystore.properties, but GitHub Actions sets CI=true and is forced to use
-// the persistent BatteryRing signing key.
+dependencies {
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
+    implementation("com.google.android.material:material:1.12.0")
+}
+
 if (System.getenv("CI") == "true" && !signingConfigured) {
     throw GradleException(
         "BatteryRing signing is not configured. Add BATTERYRING_STORE_FILE, " +

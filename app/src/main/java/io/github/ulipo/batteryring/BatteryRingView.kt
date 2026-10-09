@@ -9,9 +9,11 @@ import android.view.View
 
 class BatteryRingView(context: Context) : View(context) {
     private val prefs = Prefs.get(context)
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.BUTT
     }
     private val arcBounds = RectF()
 
@@ -27,9 +29,6 @@ class BatteryRingView(context: Context) : View(context) {
         val density = resources.displayMetrics.density
         val rotation = display?.rotation ?: Surface.ROTATION_0
 
-        // X/Y are always stored in the display's natural orientation. This makes a
-        // manual calibration survive screen rotations: the physical camera point is
-        // transformed into the current window coordinates at draw time.
         val naturalWidthPx = when (rotation) {
             Surface.ROTATION_90, Surface.ROTATION_270 -> height.toFloat()
             else -> width.toFloat()
@@ -47,19 +46,35 @@ class BatteryRingView(context: Context) : View(context) {
         )
 
         val diameterDp = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
-        val thicknessDp = prefs.getFloat(Prefs.KEY_THICKNESS_DP, Prefs.DEFAULT_THICKNESS_DP)
+        val borderThicknessDp = prefs.getFloat(
+            Prefs.KEY_BORDER_THICKNESS_DP,
+            Prefs.DEFAULT_BORDER_THICKNESS_DP
+        )
         val originDeg = prefs.getFloat(Prefs.KEY_START_ANGLE_DEG, Prefs.DEFAULT_START_ANGLE_DEG)
         val radius = diameterDp * density / 2f
+        val borderWidthPx = borderThicknessDp * density
+        val effectiveRadius = (radius - borderWidthPx / 2f).coerceAtLeast(1f)
 
-        paint.strokeWidth = thicknessDp * density
-        paint.color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
+        fillPaint.color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
+        borderPaint.strokeWidth = borderWidthPx
+        borderPaint.color = prefs.getInt(Prefs.KEY_BORDER_COLOR, Prefs.DEFAULT_BORDER_COLOR)
 
-        arcBounds.set(cx - radius, cy - radius, cx + radius, cy + radius)
+        arcBounds.set(
+            cx - effectiveRadius,
+            cy - effectiveRadius,
+            cx + effectiveRadius,
+            cy + effectiveRadius
+        )
+
         val sweep = 360f * (batteryPercent / 100f)
-        if (sweep > 0f) {
-            // Android's positive sweep is clockwise. BatteryRing intentionally runs
-            // counter-clockwise, therefore the sweep is negative.
-            canvas.drawArc(arcBounds, originDeg - 90f, -sweep, false, paint)
+        if (sweep >= 360f) {
+            canvas.drawCircle(cx, cy, effectiveRadius, fillPaint)
+        } else if (sweep > 0f) {
+            canvas.drawArc(arcBounds, originDeg - 90f, -sweep, true, fillPaint)
+        }
+
+        if (borderWidthPx > 0f) {
+            canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
         }
     }
 
@@ -70,9 +85,6 @@ class BatteryRingView(context: Context) : View(context) {
         currentWidth: Float,
         currentHeight: Float
     ): Pair<Float, Float> = when (rotation) {
-        // Display.getRotation() is the rotation applied to the drawn graphics,
-        // opposite to the device's physical rotation. Map the physical point
-        // accordingly so the ring follows the same hardware cutout.
         Surface.ROTATION_90 -> Pair(y, currentHeight - x)
         Surface.ROTATION_180 -> Pair(currentWidth - x, currentHeight - y)
         Surface.ROTATION_270 -> Pair(currentWidth - y, x)

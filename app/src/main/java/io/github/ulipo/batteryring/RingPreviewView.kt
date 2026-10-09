@@ -9,7 +9,12 @@ import android.view.View
 
 class RingPreviewView(context: Context) : View(context) {
     private val prefs = Prefs.get(context)
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+    }
     private val bounds = RectF()
 
     var batteryPercent: Float = 100f
@@ -25,29 +30,38 @@ class RingPreviewView(context: Context) : View(context) {
 
         val density = resources.displayMetrics.density
         val diameterDp = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
-        val thicknessDp = prefs.getFloat(Prefs.KEY_THICKNESS_DP, Prefs.DEFAULT_THICKNESS_DP)
+        val borderThicknessDp = prefs.getFloat(
+            Prefs.KEY_BORDER_THICKNESS_DP,
+            Prefs.DEFAULT_BORDER_THICKNESS_DP
+        )
         val originDeg = prefs.getFloat(Prefs.KEY_START_ANGLE_DEG, Prefs.DEFAULT_START_ANGLE_DEG)
         val scale = 3.0f
         val radius = diameterDp * density * scale / 2f
-        val stroke = thicknessDp * density * scale
+        val borderWidth = borderThicknessDp * density * scale
+        val effectiveRadius = (radius - borderWidth / 2f).coerceAtLeast(1f)
         val cx = width / 2f
         val cy = height / 2f
 
-        paint.style = Paint.Style.FILL
-        paint.color = Color.BLACK
-        canvas.drawCircle(cx, cy, (radius - stroke / 2f).coerceAtLeast(2f), paint)
+        fillPaint.color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
+        borderPaint.strokeWidth = borderWidth
+        borderPaint.color = prefs.getInt(Prefs.KEY_BORDER_COLOR, Prefs.DEFAULT_BORDER_COLOR)
 
-        paint.style = Paint.Style.STROKE
-        paint.strokeCap = Paint.Cap.BUTT
-        paint.strokeWidth = stroke
-        paint.color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
-        bounds.set(cx - radius, cy - radius, cx + radius, cy + radius)
-        canvas.drawArc(
-            bounds,
-            originDeg - 90f,
-            -360f * batteryPercent / 100f,
-            false,
-            paint
+        bounds.set(
+            cx - effectiveRadius,
+            cy - effectiveRadius,
+            cx + effectiveRadius,
+            cy + effectiveRadius
         )
+
+        val sweep = 360f * batteryPercent / 100f
+        if (sweep >= 360f) {
+            canvas.drawCircle(cx, cy, effectiveRadius, fillPaint)
+        } else if (sweep > 0f) {
+            canvas.drawArc(bounds, originDeg - 90f, -sweep, true, fillPaint)
+        }
+
+        if (borderWidth > 0f) {
+            canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
+        }
     }
 }

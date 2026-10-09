@@ -1,12 +1,12 @@
 package io.github.ulipo.batteryring
 
-import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -14,43 +14,57 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.text.InputType
 import android.view.Gravity
-import android.view.Surface
+import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.SeekBar
-import android.widget.Switch
-import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.slider.Slider
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.textview.MaterialTextView
+import kotlin.math.min
 import kotlin.math.roundToInt
 
-class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListener {
+class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceChangeListener {
     private val positionStepDp = 0.25f
+    private val diameterStepDp = 0.25f
+    private val borderStepDp = 0.25f
+    private val startAngleStep = 1f
     private val maxVerticalPositionDp = 120f
+    private val minDiameterDp = 4f
+    private val maxDiameterDp = 80f
+    private val maxBorderThicknessDp = 16f
 
     private lateinit var prefs: SharedPreferences
-    private lateinit var enabledSwitch: Switch
-    private lateinit var serviceStatus: TextView
-    private lateinit var batteryStatus: TextView
-    private lateinit var detectionStatus: TextView
+    private lateinit var enabledSwitch: MaterialSwitch
+    private lateinit var serviceStatus: MaterialTextView
+    private lateinit var batteryStatus: MaterialTextView
+    private lateinit var detectionStatus: MaterialTextView
     private lateinit var preview: RingPreviewView
-    private lateinit var colorInput: EditText
+    private lateinit var fillColorInput: TextInputEditText
+    private lateinit var borderColorInput: TextInputEditText
 
-    private lateinit var xSeek: SeekBar
-    private lateinit var ySeek: SeekBar
-    private lateinit var diameterSeek: SeekBar
-    private lateinit var thicknessSeek: SeekBar
-    private lateinit var startAngleSeek: SeekBar
-    private lateinit var xLabel: TextView
-    private lateinit var yLabel: TextView
-    private lateinit var diameterLabel: TextView
-    private lateinit var thicknessLabel: TextView
-    private lateinit var startAngleLabel: TextView
+    private lateinit var xSlider: Slider
+    private lateinit var ySlider: Slider
+    private lateinit var diameterSlider: Slider
+    private lateinit var borderThicknessSlider: Slider
+    private lateinit var startAngleSlider: Slider
+
+    private lateinit var xLabel: MaterialTextView
+    private lateinit var yLabel: MaterialTextView
+    private lateinit var diameterLabel: MaterialTextView
+    private lateinit var borderThicknessLabel: MaterialTextView
+    private lateinit var startAngleLabel: MaterialTextView
 
     private var batteryReceiverRegistered = false
-    private var displayWidthDp = 1f
+    private var naturalWidthDp = 1f
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -60,7 +74,7 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             if (level >= 0 && scale > 0) {
                 val percent = level * 100f / scale.toFloat()
                 batteryStatus.text =
-                    "Batteria: ${percent.toInt()}%  •  arco: ${"%.1f".format(360f * percent / 100f)}°"
+                    "Batteria: ${percent.toInt()}%  •  settore: ${"%.1f".format(360f * percent / 100f)}°"
                 preview.batteryPercent = percent
             }
         }
@@ -83,6 +97,7 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
     override fun onResume() {
         super.onResume()
         updateServiceStatus()
+        syncControlsFromPrefs()
     }
 
     override fun onStop() {
@@ -103,196 +118,221 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
 
     override fun onSharedPreferenceChanged(sharedPreferences: SharedPreferences?, key: String?) {
         if (::preview.isInitialized) preview.invalidate()
-
         when (key) {
             Prefs.KEY_CENTER_X_DP,
             Prefs.KEY_CENTER_Y_DP,
             Prefs.KEY_DIAMETER_DP,
-            Prefs.KEY_THICKNESS_DP,
+            Prefs.KEY_BORDER_THICKNESS_DP,
             Prefs.KEY_START_ANGLE_DEG,
-            Prefs.KEY_COLOR -> {
-                if (::xSeek.isInitialized) syncControlsFromPrefs()
-            }
-
-            Prefs.KEY_DETECTION_INFO -> {
-                if (::detectionStatus.isInitialized) updateDetectionStatus()
-            }
+            Prefs.KEY_COLOR,
+            Prefs.KEY_BORDER_COLOR,
+            Prefs.KEY_DETECTION_INFO,
+            Prefs.KEY_ENABLED -> syncControlsFromPrefs()
         }
     }
 
-    private fun buildUi(): ScrollView {
-        val scroll = ScrollView(this)
+    private fun buildUi(): View {
+        naturalWidthDp = naturalDisplayWidthDp().coerceAtLeast(1f)
+
+        val scroll = ScrollView(this).apply { isFillViewport = true }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(32))
+            setPadding(dp(16), dp(12), dp(16), dp(24))
         }
-        scroll.addView(root, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-
-        root.addView(TextView(this).apply {
-            text = "BatteryRing"
-            textSize = 30f
-            setTextColor(Color.rgb(18, 20, 24))
-        })
-        root.addView(TextView(this).apply {
-            text = "Anello della batteria attorno alla fotocamera frontale"
-            textSize = 15f
-            setPadding(0, dp(4), 0, dp(16))
-        })
-
-        serviceStatus = TextView(this).apply {
-            textSize = 15f
-            setPadding(dp(12), dp(10), dp(12), dp(10))
-        }
-        root.addView(serviceStatus, matchWrap())
-
-        root.addView(Button(this).apply {
-            text = "Apri impostazioni Accessibilità"
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-        }, matchWrap())
-
-        enabledSwitch = Switch(this).apply {
-            text = "Indicatore attivo"
-            textSize = 17f
-            setPadding(0, dp(10), 0, dp(10))
-            setOnCheckedChangeListener { _, checked ->
-                prefs.edit().putBoolean(Prefs.KEY_ENABLED, checked).apply()
-            }
-        }
-        root.addView(enabledSwitch, matchWrap())
-
-        batteryStatus = TextView(this).apply {
-            text = "Batteria: —"
-            textSize = 16f
-            setPadding(0, dp(6), 0, dp(8))
-        }
-        root.addView(batteryStatus, matchWrap())
-
-        preview = RingPreviewView(this).apply {
-            minimumHeight = dp(150)
-        }
-        root.addView(
-            preview,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(150)).apply {
-                bottomMargin = dp(18)
-            }
+        scroll.addView(
+            root,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
         )
 
-        root.addView(sectionTitle("Posizione e dimensioni"))
+        root.addView(MaterialToolbar(this).apply {
+            title = "BatteryRing"
+            subtitle = "Indicatore batteria attorno alla fotocamera"
+        }, matchWrap())
 
-        val metrics = resources.displayMetrics
-        @Suppress("DEPRECATION")
-        val rotation = windowManager.defaultDisplay.rotation
-        displayWidthDp = when (rotation) {
-            Surface.ROTATION_90, Surface.ROTATION_270 -> metrics.heightPixels / metrics.density
-            else -> metrics.widthPixels / metrics.density
-        }
+        serviceStatus = supportingText("")
+        root.addView(sectionCard("Stato") {
+            addView(serviceStatus)
+        }, cardParams())
 
-        xLabel = valueLabel("")
-        root.addView(xLabel)
-        xSeek = SeekBar(this).apply {
-            max = (displayWidthDp / positionStepDp).roundToInt().coerceAtLeast(1)
-            setOnSeekBarChangeListener(simpleSeekListener { progress ->
-                setPosition(Prefs.KEY_CENTER_X_DP, progressToPositionDp(progress), true)
+        root.addView(sectionCard("Controlli rapidi") {
+            addView(MaterialButton(context).apply {
+                text = "Apri impostazioni Accessibilità"
+                setOnClickListener {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                }
+            }, matchWrap())
+
+            enabledSwitch = MaterialSwitch(context).apply {
+                text = "Indicatore attivo"
+                setOnCheckedChangeListener { _, checked ->
+                    prefs.edit().putBoolean(Prefs.KEY_ENABLED, checked).apply()
+                }
+            }
+            addView(enabledSwitch, matchWrap())
+        }, cardParams())
+
+        root.addView(sectionCard("Anteprima") {
+            batteryStatus = bodyText("Batteria: —")
+            addView(batteryStatus)
+
+            preview = RingPreviewView(context).apply { minimumHeight = dp(180) }
+            addView(
+                preview,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    dp(180)
+                ).apply { topMargin = dp(12) }
+            )
+        }, cardParams())
+
+        root.addView(sectionCard("Posizione e rilevamento") {
+            xLabel = labelText("")
+            addView(xLabel)
+            xSlider = createSlider(0f, naturalWidthDp, positionStepDp) {
+                setFloatPref(Prefs.KEY_CENTER_X_DP, it.coerceIn(0f, naturalWidthDp))
+            }
+            addView(xSlider, matchWrap())
+            addView(fineAdjustButtons("−0,25 dp", "+0,25 dp",
+                onMinus = {
+                    nudgeFloatPref(Prefs.KEY_CENTER_X_DP, -positionStepDp, 0f, naturalWidthDp)
+                },
+                onPlus = {
+                    nudgeFloatPref(Prefs.KEY_CENTER_X_DP, positionStepDp, 0f, naturalWidthDp)
+                }
+            ))
+
+            yLabel = labelText("")
+            addView(yLabel)
+            ySlider = createSlider(0f, maxVerticalPositionDp, positionStepDp) {
+                setFloatPref(Prefs.KEY_CENTER_Y_DP, it.coerceIn(0f, maxVerticalPositionDp))
+            }
+            addView(ySlider, matchWrap())
+            addView(fineAdjustButtons("−0,25 dp", "+0,25 dp",
+                onMinus = {
+                    nudgeFloatPref(Prefs.KEY_CENTER_Y_DP, -positionStepDp, 0f, maxVerticalPositionDp)
+                },
+                onPlus = {
+                    nudgeFloatPref(Prefs.KEY_CENTER_Y_DP, positionStepDp, 0f, maxVerticalPositionDp)
+                }
+            ))
+
+            addView(MaterialButton(context).apply {
+                text = "Rileva automaticamente il foro"
+                setOnClickListener { requestCameraCutoutDetection() }
+            }, matchWrap())
+
+            detectionStatus = supportingText("Nessun rilevamento automatico eseguito.").apply {
+                setTextIsSelectable(true)
+            }
+            addView(detectionStatus)
+        }, cardParams())
+
+        root.addView(sectionCard("Aspetto") {
+            diameterLabel = labelText("")
+            addView(diameterLabel)
+            diameterSlider = createSlider(minDiameterDp, maxDiameterDp, diameterStepDp) {
+                setFloatPref(Prefs.KEY_DIAMETER_DP, it.coerceIn(minDiameterDp, maxDiameterDp))
+            }
+            addView(diameterSlider, matchWrap())
+            addView(fineAdjustButtons("−0,25 dp", "+0,25 dp",
+                onMinus = {
+                    nudgeFloatPref(Prefs.KEY_DIAMETER_DP, -diameterStepDp, minDiameterDp, maxDiameterDp)
+                },
+                onPlus = {
+                    nudgeFloatPref(Prefs.KEY_DIAMETER_DP, diameterStepDp, minDiameterDp, maxDiameterDp)
+                }
+            ))
+
+            borderThicknessLabel = labelText("")
+            addView(borderThicknessLabel)
+            borderThicknessSlider = createSlider(0f, maxBorderThicknessDp, borderStepDp) {
+                setFloatPref(Prefs.KEY_BORDER_THICKNESS_DP, it.coerceIn(0f, maxBorderThicknessDp))
+            }
+            addView(borderThicknessSlider, matchWrap())
+            addView(fineAdjustButtons("−0,25 dp", "+0,25 dp",
+                onMinus = {
+                    nudgeFloatPref(
+                        Prefs.KEY_BORDER_THICKNESS_DP,
+                        -borderStepDp,
+                        0f,
+                        maxBorderThicknessDp
+                    )
+                },
+                onPlus = {
+                    nudgeFloatPref(
+                        Prefs.KEY_BORDER_THICKNESS_DP,
+                        borderStepDp,
+                        0f,
+                        maxBorderThicknessDp
+                    )
+                }
+            ))
+
+            startAngleLabel = labelText("")
+            addView(startAngleLabel)
+            startAngleSlider = createSlider(0f, 359f, startAngleStep) {
+                setFloatPref(Prefs.KEY_START_ANGLE_DEG, it.coerceIn(0f, 359f))
+            }
+            addView(startAngleSlider, matchWrap())
+            addView(fineAdjustButtons("−1°", "+1°",
+                onMinus = { nudgeAngle(-startAngleStep) },
+                onPlus = { nudgeAngle(startAngleStep) }
+            ))
+        }, cardParams())
+
+        root.addView(colorCard(
+            title = "Riempimento",
+            hint = "#00E676",
+            prefKey = Prefs.KEY_COLOR,
+            onInputReady = { fillColorInput = it }
+        ), cardParams())
+
+        root.addView(colorCard(
+            title = "Bordo",
+            hint = "#FFFFFF",
+            prefKey = Prefs.KEY_BORDER_COLOR,
+            onInputReady = { borderColorInput = it }
+        ), cardParams())
+
+        root.addView(sectionCard("Informazioni") {
+            addView(supportingText(
+                "Il servizio di accessibilità viene usato esclusivamente per disegnare " +
+                    "l'indicatore sopra la barra di stato. BatteryRing non legge il contenuto " +
+                    "delle finestre e l'overlay non riceve tocchi."
+            ))
+        }, cardParams())
+
+        return scroll
+    }
+
+    private fun sectionCard(title: String, contentBuilder: LinearLayout.() -> Unit): MaterialCardView {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(MaterialTextView(context).apply {
+                text = title
+                textSize = 20f
+                setPadding(0, 0, 0, dp(12))
             })
+            contentBuilder()
         }
-        root.addView(xSeek, matchWrap())
-        root.addView(nudgeRow(
-            onMinus = { nudgePosition(Prefs.KEY_CENTER_X_DP, -positionStepDp, 0f, displayWidthDp) },
-            onPlus = { nudgePosition(Prefs.KEY_CENTER_X_DP, positionStepDp, 0f, displayWidthDp) }
-        ))
 
-        yLabel = valueLabel("")
-        root.addView(yLabel)
-        ySeek = SeekBar(this).apply {
-            max = (maxVerticalPositionDp / positionStepDp).roundToInt()
-            setOnSeekBarChangeListener(simpleSeekListener { progress ->
-                setPosition(Prefs.KEY_CENTER_Y_DP, progressToPositionDp(progress), false)
-            })
+        return MaterialCardView(this).apply {
+            radius = dp(22).toFloat()
+            cardElevation = dp(1).toFloat()
+            setContentPadding(dp(16), dp(16), dp(16), dp(16))
+            addView(content, matchWrap())
         }
-        root.addView(ySeek, matchWrap())
-        root.addView(nudgeRow(
-            onMinus = { nudgePosition(Prefs.KEY_CENTER_Y_DP, -positionStepDp, 0f, maxVerticalPositionDp) },
-            onPlus = { nudgePosition(Prefs.KEY_CENTER_Y_DP, positionStepDp, 0f, maxVerticalPositionDp) }
-        ))
+    }
 
-        diameterLabel = valueLabel("")
-        root.addView(diameterLabel)
-        diameterSeek = SeekBar(this).apply {
-            max = 76
-            setOnSeekBarChangeListener(simpleSeekListener { raw ->
-                val value = raw + 4
-                prefs.edit().putFloat(Prefs.KEY_DIAMETER_DP, value.toFloat()).apply()
-            })
-        }
-        root.addView(diameterSeek, matchWrap())
-
-        thicknessLabel = valueLabel("")
-        root.addView(thicknessLabel)
-        thicknessSeek = SeekBar(this).apply {
-            max = 38
-            setOnSeekBarChangeListener(simpleSeekListener { raw ->
-                val value = (raw + 2) / 2f
-                prefs.edit().putFloat(Prefs.KEY_THICKNESS_DP, value).apply()
-            })
-        }
-        root.addView(thicknessSeek, matchWrap())
-
-        startAngleLabel = valueLabel("")
-        root.addView(startAngleLabel)
-        startAngleSeek = SeekBar(this).apply {
-            max = 359
-            setOnSeekBarChangeListener(simpleSeekListener { degrees ->
-                prefs.edit().putFloat(Prefs.KEY_START_ANGLE_DEG, degrees.toFloat()).apply()
-            })
-        }
-        root.addView(startAngleSeek, matchWrap())
-
-        root.addView(TextView(this).apply {
-            text = "Origine: 0° = ore 12, 90° = ore 3, 180° = ore 6, 270° = ore 9. L'arco procede in senso antiorario."
-            textSize = 13f
-            setPadding(0, 0, 0, dp(8))
-        })
-
-        root.addView(Button(this).apply {
-            text = "Rileva automaticamente il foro"
-            setOnClickListener { requestCameraCutoutDetection() }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            topMargin = dp(8)
-        })
-
-        detectionStatus = TextView(this).apply {
-            textSize = 12f
-            setPadding(dp(8), dp(8), dp(8), dp(18))
-            setTextIsSelectable(true)
-        }
-        root.addView(detectionStatus, matchWrap())
-
-        root.addView(sectionTitle("Colore"))
-        val colorRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        colorInput = EditText(this).apply {
-            hint = "#00E676"
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
-            setSingleLine(true)
-        }
-        colorRow.addView(colorInput, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        colorRow.addView(Button(this).apply {
-            text = "Applica"
-            setOnClickListener { applyTypedColor() }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            marginStart = dp(8)
-        })
-        root.addView(colorRow, matchWrap())
-
-        val presets = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, dp(8), 0, dp(14))
-        }
+    private fun colorCard(
+        title: String,
+        hint: String,
+        prefKey: String,
+        onInputReady: (TextInputEditText) -> Unit
+    ): MaterialCardView {
         val presetColors = listOf(
             Color.WHITE,
             Color.rgb(0, 230, 118),
@@ -302,57 +342,124 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
             Color.RED,
             Color.MAGENTA
         )
-        presetColors.forEach { color ->
-            presets.addView(Button(this).apply {
-                text = "●"
-                textSize = 24f
-                setTextColor(color)
-                setOnClickListener {
-                    prefs.edit().putInt(Prefs.KEY_COLOR, color).apply()
-                }
-            }, LinearLayout.LayoutParams(0, dp(52), 1f))
+
+        return sectionCard(title) {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val layout = TextInputLayout(context).apply { this.hint = hint }
+            val editText = TextInputEditText(context).apply {
+                inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS
+                setSingleLine(true)
+            }
+            layout.addView(editText, matchWrap())
+            onInputReady(editText)
+            row.addView(layout, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            row.addView(MaterialButton(context).apply {
+                text = "Applica"
+                setOnClickListener { applyTypedColor(editText, prefKey) }
+            }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                marginStart = dp(8)
+            })
+            addView(row, matchWrap())
+
+            val scroller = HorizontalScrollView(context).apply {
+                isHorizontalScrollBarEnabled = false
+            }
+            val presetRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, dp(12), 0, 0)
+            }
+            presetColors.forEach { color ->
+                presetRow.addView(MaterialButton(context).apply {
+                    text = ""
+                    minWidth = 0
+                    minimumWidth = 0
+                    minimumHeight = 0
+                    insetTop = 0
+                    insetBottom = 0
+                    insetLeft = 0
+                    insetRight = 0
+                    cornerRadius = dp(20)
+                    strokeWidth = dp(1)
+                    strokeColor = ColorStateList.valueOf(Color.argb(100, 0, 0, 0))
+                    backgroundTintList = ColorStateList.valueOf(color)
+                    setOnClickListener { prefs.edit().putInt(prefKey, color).apply() }
+                }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(8) })
+            }
+            scroller.addView(
+                presetRow,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
+            addView(scroller, matchWrap())
         }
-        root.addView(presets, matchWrap())
-
-        root.addView(TextView(this).apply {
-            text = "Il servizio di accessibilità viene usato esclusivamente per poter disegnare l'anello sopra la barra di stato. BatteryRing non legge il contenuto delle finestre e l'overlay non riceve tocchi."
-            textSize = 13f
-            setPadding(0, dp(12), 0, 0)
-        })
-
-        return scroll
     }
 
     private fun syncControlsFromPrefs() {
-        val density = resources.displayMetrics.density
-        val defaultX = resources.displayMetrics.widthPixels / density / 2f
-        enabledSwitch.isChecked = prefs.getBoolean(Prefs.KEY_ENABLED, true)
+        naturalWidthDp = naturalDisplayWidthDp().coerceAtLeast(1f)
+        if (::enabledSwitch.isInitialized) {
+            enabledSwitch.isChecked = prefs.getBoolean(Prefs.KEY_ENABLED, true)
+        }
 
-        val x = prefs.getFloat(Prefs.KEY_CENTER_X_DP, defaultX).coerceIn(0f, displayWidthDp)
+        val x = prefs.getFloat(Prefs.KEY_CENTER_X_DP, naturalWidthDp / 2f).coerceIn(0f, naturalWidthDp)
         val y = prefs.getFloat(Prefs.KEY_CENTER_Y_DP, 16f).coerceIn(0f, maxVerticalPositionDp)
         val diameter = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
-        val thickness = prefs.getFloat(Prefs.KEY_THICKNESS_DP, Prefs.DEFAULT_THICKNESS_DP)
+            .coerceIn(minDiameterDp, maxDiameterDp)
+        val borderThickness = prefs.getFloat(
+            Prefs.KEY_BORDER_THICKNESS_DP,
+            Prefs.DEFAULT_BORDER_THICKNESS_DP
+        ).coerceIn(0f, maxBorderThicknessDp)
         val startAngle = prefs.getFloat(
             Prefs.KEY_START_ANGLE_DEG,
             Prefs.DEFAULT_START_ANGLE_DEG
         ).coerceIn(0f, 359f)
 
-        xSeek.progress = positionToProgress(x).coerceIn(0, xSeek.max)
-        ySeek.progress = positionToProgress(y).coerceIn(0, ySeek.max)
-        diameterSeek.progress = (diameter.roundToInt() - 4).coerceIn(0, diameterSeek.max)
-        thicknessSeek.progress = (thickness * 2f - 2f).roundToInt().coerceIn(0, thicknessSeek.max)
-        startAngleSeek.progress = startAngle.roundToInt().coerceIn(0, startAngleSeek.max)
+        if (::xSlider.isInitialized) {
+            xSlider.valueTo = naturalWidthDp
+            xSlider.value = x
+            ySlider.value = y
+            diameterSlider.value = diameter
+            borderThicknessSlider.value = borderThickness
+            startAngleSlider.value = startAngle
+        }
 
-        xLabel.text = "Posizione X: ${formatDp(x)} dp"
-        yLabel.text = "Posizione Y: ${formatDp(y)} dp (0–${maxVerticalPositionDp.toInt()})"
-        diameterLabel.text = "Diametro anello: ${diameter.roundToInt()} dp"
-        thicknessLabel.text = "Spessore: ${"%.1f".format(thickness)} dp"
-        startAngleLabel.text = "Origine arco: ${startAngle.roundToInt()}° ${angleClockLabel(startAngle)}"
+        if (::xLabel.isInitialized) {
+            xLabel.text = "Posizione X: ${formatDp(x)} dp"
+            yLabel.text = "Posizione Y: ${formatDp(y)} dp (solo fascia superiore)"
+            diameterLabel.text = "Diametro: ${formatDp(diameter)} dp"
+            borderThicknessLabel.text = "Spessore bordo: ${formatDp(borderThickness)} dp"
+            startAngleLabel.text = "Origine settore: ${startAngle.roundToInt()}° ${angleClockLabel(startAngle)}"
+        }
 
-        val color = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
-        colorInput.setText(String.format("#%06X", 0xFFFFFF and color))
+        if (::fillColorInput.isInitialized) {
+            val fillColor = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
+            fillColorInput.setText(String.format("#%06X", 0xFFFFFF and fillColor))
+        }
+        if (::borderColorInput.isInitialized) {
+            val borderColor = prefs.getInt(Prefs.KEY_BORDER_COLOR, Prefs.DEFAULT_BORDER_COLOR)
+            borderColorInput.setText(String.format("#%06X", 0xFFFFFF and borderColor))
+        }
+
         updateDetectionStatus()
-        preview.invalidate()
+        if (::preview.isInitialized) preview.invalidate()
+    }
+
+    private fun createSlider(
+        valueFrom: Float,
+        valueTo: Float,
+        step: Float,
+        onChanged: (Float) -> Unit
+    ) = Slider(this).apply {
+        this.valueFrom = valueFrom
+        this.valueTo = valueTo
+        this.stepSize = step
+        addOnChangeListener { _, value, fromUser ->
+            if (fromUser) onChanged(value)
+        }
     }
 
     private fun requestCameraCutoutDetection() {
@@ -376,55 +483,40 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
     }
 
     private fun updateDetectionStatus() {
-        val info = prefs.getString(Prefs.KEY_DETECTION_INFO, null)
-        detectionStatus.text = info ?: "Nessun rilevamento automatico eseguito."
-    }
-
-    private fun setPosition(key: String, value: Float, horizontal: Boolean) {
-        val max = if (horizontal) displayWidthDp else maxVerticalPositionDp
-        prefs.edit().putFloat(key, value.coerceIn(0f, max)).apply()
-    }
-
-    private fun nudgePosition(key: String, delta: Float, min: Float, max: Float) {
-        val default = if (key == Prefs.KEY_CENTER_X_DP) displayWidthDp / 2f else 16f
-        val value = (prefs.getFloat(key, default) + delta).coerceIn(min, max)
-        prefs.edit().putFloat(key, value).apply()
-    }
-
-    private fun nudgeRow(onMinus: () -> Unit, onPlus: () -> Unit): LinearLayout {
-        return LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(0, 0, 0, dp(4))
-            addView(Button(this@MainActivity).apply {
-                text = "−0,25 dp"
-                setOnClickListener { onMinus() }
-            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginEnd = dp(4)
-            })
-            addView(Button(this@MainActivity).apply {
-                text = "+0,25 dp"
-                setOnClickListener { onPlus() }
-            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
-                marginStart = dp(4)
-            })
+        if (::detectionStatus.isInitialized) {
+            detectionStatus.text = prefs.getString(Prefs.KEY_DETECTION_INFO, null)
+                ?: "Nessun rilevamento automatico eseguito."
         }
     }
 
-    private fun angleClockLabel(degrees: Float): String = when (degrees.roundToInt()) {
-        0 -> "(ore 12)"
-        90 -> "(ore 3)"
-        180 -> "(ore 6)"
-        270 -> "(ore 9)"
-        else -> ""
+    private fun setFloatPref(key: String, value: Float) {
+        prefs.edit().putFloat(key, value).apply()
     }
 
-    private fun applyTypedColor() {
-        val raw = colorInput.text.toString().trim()
+    private fun nudgeFloatPref(key: String, delta: Float, min: Float, max: Float) {
+        val default = when (key) {
+            Prefs.KEY_CENTER_X_DP -> naturalWidthDp / 2f
+            Prefs.KEY_CENTER_Y_DP -> 16f
+            Prefs.KEY_DIAMETER_DP -> Prefs.DEFAULT_DIAMETER_DP
+            Prefs.KEY_BORDER_THICKNESS_DP -> Prefs.DEFAULT_BORDER_THICKNESS_DP
+            else -> 0f
+        }
+        val newValue = (prefs.getFloat(key, default) + delta).coerceIn(min, max)
+        prefs.edit().putFloat(key, newValue).apply()
+    }
+
+    private fun nudgeAngle(delta: Float) {
+        val current = prefs.getFloat(Prefs.KEY_START_ANGLE_DEG, Prefs.DEFAULT_START_ANGLE_DEG)
+        val value = (((current + delta) % 360f) + 360f) % 360f
+        prefs.edit().putFloat(Prefs.KEY_START_ANGLE_DEG, value).apply()
+    }
+
+    private fun applyTypedColor(input: TextInputEditText, key: String) {
+        val raw = input.text?.toString()?.trim().orEmpty()
         try {
             val normalized = if (raw.startsWith("#")) raw else "#$raw"
             val color = Color.parseColor(normalized)
-            prefs.edit().putInt(Prefs.KEY_COLOR, color).apply()
+            prefs.edit().putInt(key, color).apply()
         } catch (_: IllegalArgumentException) {
             toast("Colore non valido. Usa il formato #RRGGBB, ad esempio #00E676.")
         }
@@ -435,11 +527,8 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         serviceStatus.text = if (enabled) {
             "Servizio Accessibilità: ATTIVO"
         } else {
-            "Servizio Accessibilità: DISATTIVATO — abilitalo per mostrare l'anello sopra la barra di stato"
+            "Servizio Accessibilità: DISATTIVATO — abilitalo per mostrare l'indicatore sopra la barra di stato"
         }
-        serviceStatus.setTextColor(
-            if (enabled) Color.rgb(0, 120, 70) else Color.rgb(180, 45, 45)
-        )
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
@@ -465,44 +554,79 @@ class MainActivity : Activity(), SharedPreferences.OnSharedPreferenceChangeListe
         batteryReceiverRegistered = true
     }
 
-    private fun sectionTitle(text: String) = TextView(this).apply {
+    private fun bodyText(text: String) = MaterialTextView(this).apply {
         this.text = text
-        textSize = 20f
-        setTextColor(Color.rgb(18, 20, 24))
-        setPadding(0, dp(8), 0, dp(8))
+        textSize = 16f
     }
 
-    private fun valueLabel(text: String) = TextView(this).apply {
+    private fun supportingText(text: String) = MaterialTextView(this).apply {
+        this.text = text
+        textSize = 14f
+    }
+
+    private fun labelText(text: String) = MaterialTextView(this).apply {
         this.text = text
         textSize = 15f
-        setPadding(0, dp(7), 0, 0)
+        setPadding(0, dp(8), 0, dp(4))
     }
 
-    private fun simpleSeekListener(onChanged: (Int) -> Unit) =
-        object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                if (fromUser) onChanged(progress)
+    private fun fineAdjustButtons(
+        minusLabel: String,
+        plusLabel: String,
+        onMinus: () -> Unit,
+        onPlus: () -> Unit
+    ): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPadding(0, 0, 0, dp(6))
+        addView(
+            MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = minusLabel
+                setOnClickListener { onMinus() }
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginEnd = dp(6)
             }
+        )
+        addView(
+            MaterialButton(context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle).apply {
+                text = plusLabel
+                setOnClickListener { onPlus() }
+            },
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(6)
+            }
+        )
+    }
 
-            override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
-            override fun onStopTrackingTouch(seekBar: SeekBar?) = Unit
-        }
+    private fun angleClockLabel(degrees: Float): String = when (degrees.roundToInt()) {
+        0 -> "(ore 12)"
+        90 -> "(ore 3)"
+        180 -> "(ore 6)"
+        270 -> "(ore 9)"
+        else -> ""
+    }
 
-    private fun positionToProgress(valueDp: Float): Int =
-        (valueDp / positionStepDp).roundToInt()
-
-    private fun progressToPositionDp(progress: Int): Float =
-        progress * positionStepDp
+    private fun naturalDisplayWidthDp(): Float {
+        val metrics = resources.displayMetrics
+        return min(metrics.widthPixels, metrics.heightPixels) / metrics.density
+    }
 
     private fun formatDp(value: Float): String = String.format("%.2f", value)
 
-    private fun matchWrap() = LinearLayout.LayoutParams(
+    private fun matchWrap() = ViewGroup.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT,
         ViewGroup.LayoutParams.WRAP_CONTENT
     )
 
-    private fun dp(value: Int): Int =
-        (value * resources.displayMetrics.density + 0.5f).toInt()
+    private fun cardParams() = LinearLayout.LayoutParams(
+        ViewGroup.LayoutParams.MATCH_PARENT,
+        ViewGroup.LayoutParams.WRAP_CONTENT
+    ).apply {
+        topMargin = dp(12)
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density + 0.5f).toInt()
 
     private fun toast(message: String) = Toast.makeText(this, message, Toast.LENGTH_LONG).show()
 }
