@@ -451,12 +451,17 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun createSlider(
         valueFrom: Float,
         valueTo: Float,
-        step: Float,
+        @Suppress("UNUSED_PARAMETER") step: Float,
         onChanged: (Float) -> Unit
     ) = Slider(this).apply {
         this.valueFrom = valueFrom
         this.valueTo = valueTo
-        this.stepSize = step
+        // Keep Material sliders continuous. Display dimensions and values detected from
+        // DisplayCutout are often fractional dp values and therefore are not guaranteed
+        // to align with a discrete 0.25 dp grid. Material validates discrete sliders at
+        // runtime and rejects ranges/values that are not exact multiples of stepSize.
+        // Fine adjustment remains deterministic through the +/- buttons.
+        this.stepSize = 0f
         addOnChangeListener { _, value, fromUser ->
             if (fromUser) onChanged(value)
         }
