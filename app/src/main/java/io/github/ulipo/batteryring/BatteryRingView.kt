@@ -6,8 +6,8 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.view.Surface
 import android.view.View
+import kotlin.math.abs
 
 class BatteryRingView(context: Context) : View(context) {
     private val prefs = Prefs.get(context)
@@ -21,31 +21,20 @@ class BatteryRingView(context: Context) : View(context) {
 
     var batteryPercent: Float = 100f
         set(value) {
-            field = value.coerceIn(0f, 100f)
+            val clamped = value.coerceIn(0f, 100f)
+            if (abs(field - clamped) < 0.001f) return
+            field = clamped
             invalidate()
         }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        // The WindowManager positions this small overlay directly around the physical
+        // camera. The view itself only needs to draw at its local centre.
+        val cx = width / 2f
+        val cy = height / 2f
         val density = resources.displayMetrics.density
-        val rotation = display?.rotation ?: Surface.ROTATION_0
-
-        val naturalWidthPx = when (rotation) {
-            Surface.ROTATION_90, Surface.ROTATION_270 -> height.toFloat()
-            else -> width.toFloat()
-        }
-        val defaultXdp = if (naturalWidthPx > 0f) naturalWidthPx / density / 2f else 180f
-        val naturalX = prefs.getFloat(Prefs.KEY_CENTER_X_DP, defaultXdp) * density
-        val naturalY = prefs.getFloat(Prefs.KEY_CENTER_Y_DP, 16f) * density
-
-        val (cx, cy) = naturalToCurrentPoint(
-            x = naturalX,
-            y = naturalY,
-            rotation = rotation,
-            currentWidth = width.toFloat(),
-            currentHeight = height.toFloat()
-        )
 
         val diameterDp = prefs.getFloat(Prefs.KEY_DIAMETER_DP, Prefs.DEFAULT_DIAMETER_DP)
         val borderThicknessDp = prefs.getFloat(
@@ -82,18 +71,5 @@ class BatteryRingView(context: Context) : View(context) {
                 canvas.drawArc(arcBounds, originDeg - 90f, -sweep, false, borderPaint)
             }
         }
-    }
-
-    private fun naturalToCurrentPoint(
-        x: Float,
-        y: Float,
-        rotation: Int,
-        currentWidth: Float,
-        currentHeight: Float
-    ): Pair<Float, Float> = when (rotation) {
-        Surface.ROTATION_90 -> Pair(y, currentHeight - x)
-        Surface.ROTATION_180 -> Pair(currentWidth - x, currentHeight - y)
-        Surface.ROTATION_270 -> Pair(currentWidth - y, x)
-        else -> Pair(x, y)
     }
 }

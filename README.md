@@ -6,9 +6,11 @@ BatteryRing mostra un settore circolare colorato sopra il foro della fotocamera 
 
 - Overlay `TYPE_ACCESSIBILITY_OVERLAY`, pensato per essere visibile anche sopra una status bar opaca.
 - Nessun permesso `SYSTEM_ALERT_WINDOW`.
-- Il servizio di accessibilità non legge il contenuto delle finestre (`canRetrieveWindowContent=false`) e ignora gli eventi ricevuti.
+- Il servizio di accessibilità non legge il contenuto delle finestre (`canRetrieveWindowContent=false`) e non richiede eventi di accessibilità.
 - L'overlay è `NOT_TOUCHABLE` e `NOT_FOCUSABLE`: non intercetta tocchi né focus.
 - Aggiornamento della batteria tramite `ACTION_BATTERY_CHANGED`, senza polling continuo.
+- Overlay compatto limitato alla zona della fotocamera durante il funzionamento normale.
+- A schermo spento overlay e listener della batteria vengono sospesi; alla riaccensione lo stato viene sincronizzato immediatamente.
 - Posizione X/Y, diametro, colore di riempimento, colore/spessore del bordo e origine del settore configurabili in tempo reale.
 - Interfaccia Material 3 con palette Nord dark.
 - Rilevamento automatico del `DisplayCutout` quando il dispositivo lo espone.
@@ -76,6 +78,17 @@ La gestione della sovrapposizione alle finestre di sistema può avere differenze
 ### Screen rotation
 
 The camera centre is stored in the display's natural coordinate system. The overlay transforms that point for `ROTATION_0`, `ROTATION_90`, `ROTATION_180` and `ROTATION_270`, so a portrait calibration follows the same physical punch-hole when the device rotates. The accessibility overlay is recreated on configuration changes to pick up the new full-screen bounds and cutout geometry.
+
+## Changes in 1.5.1
+
+### Low-power mode
+
+- L'overlay permanente non è più full-screen: viene ridotto a un piccolo quadrato attorno alla fotocamera.
+- L'overlay full-screen viene creato solo temporaneamente durante il rilevamento automatico del `DisplayCutout`.
+- A schermo spento l'overlay viene rimosso e il receiver della batteria viene disregistrato.
+- Alla riaccensione il livello della batteria viene riletto dal broadcast sticky `ACTION_BATTERY_CHANGED`.
+- Il servizio richiede zero eventi di accessibilità e l'overlay non è esposto all'albero di accessibilità.
+- La view viene ridisegnata solo quando cambia realmente la percentuale di batteria o una preferenza grafica.
 
 ## Licenza
 
