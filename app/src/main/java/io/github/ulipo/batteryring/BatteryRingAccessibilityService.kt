@@ -103,6 +103,7 @@ class BatteryRingAccessibilityService : AccessibilityService(),
             }
             Prefs.KEY_BORDER_THICKNESS_DP,
             Prefs.KEY_START_ANGLE_DEG,
+            Prefs.KEY_CLOCKWISE,
             Prefs.KEY_COLOR,
             Prefs.KEY_BORDER_COLOR -> ringView?.invalidate()
             // Detection diagnostics and unrelated preferences do not affect drawing.
