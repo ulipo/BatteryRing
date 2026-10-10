@@ -16,12 +16,14 @@ object Prefs {
     const val KEY_BORDER_COLOR = "border_color"
     const val KEY_BORDER_THICKNESS_DP = "border_thickness_dp"
     const val KEY_START_ANGLE_DEG = "start_angle_deg"
+    const val KEY_CLOCKWISE = "clockwise"
 
     const val KEY_DETECT_REQUEST_ID = "detect_request_id"
     const val KEY_DETECTION_INFO = "detection_info"
 
     const val DEFAULT_DIAMETER_DP = 13f
     const val DEFAULT_START_ANGLE_DEG = 0f
+    const val DEFAULT_CLOCKWISE = false
     const val DEFAULT_BORDER_THICKNESS_DP = 0f
     val DEFAULT_COLOR: Int = NordPalette.Nord14
     val DEFAULT_BORDER_COLOR: Int = NordPalette.Nord6
