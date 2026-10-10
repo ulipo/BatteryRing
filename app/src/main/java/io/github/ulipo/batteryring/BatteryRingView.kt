@@ -42,6 +42,7 @@ class BatteryRingView(context: Context) : View(context) {
             Prefs.DEFAULT_BORDER_THICKNESS_DP
         )
         val originDeg = prefs.getFloat(Prefs.KEY_START_ANGLE_DEG, Prefs.DEFAULT_START_ANGLE_DEG)
+        val clockwise = prefs.getBoolean(Prefs.KEY_CLOCKWISE, Prefs.DEFAULT_CLOCKWISE)
         val radius = diameterDp * density / 2f
         val borderWidthPx = borderThicknessDp * density
         val effectiveRadius = (radius - borderWidthPx / 2f).coerceAtLeast(1f)
@@ -58,17 +59,18 @@ class BatteryRingView(context: Context) : View(context) {
         )
 
         val sweep = 360f * (batteryPercent / 100f)
+        val signedSweep = if (clockwise) sweep else -sweep
         if (sweep >= 360f) {
             canvas.drawCircle(cx, cy, effectiveRadius, fillPaint)
         } else if (sweep > 0f) {
-            canvas.drawArc(arcBounds, originDeg - 90f, -sweep, true, fillPaint)
+            canvas.drawArc(arcBounds, originDeg - 90f, signedSweep, true, fillPaint)
         }
 
         if (borderWidthPx > 0f && sweep > 0f) {
             if (sweep >= 360f) {
                 canvas.drawCircle(cx, cy, effectiveRadius, borderPaint)
             } else {
-                canvas.drawArc(arcBounds, originDeg - 90f, -sweep, false, borderPaint)
+                canvas.drawArc(arcBounds, originDeg - 90f, signedSweep, false, borderPaint)
             }
         }
     }
