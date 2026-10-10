@@ -25,6 +25,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.slider.Slider
@@ -58,6 +59,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private lateinit var diameterSlider: Slider
     private lateinit var borderThicknessSlider: Slider
     private lateinit var startAngleSlider: Slider
+    private lateinit var directionToggle: MaterialButtonToggleGroup
+    private lateinit var clockwiseButton: MaterialButton
+    private lateinit var counterclockwiseButton: MaterialButton
 
     private lateinit var xLabel: MaterialTextView
     private lateinit var yLabel: MaterialTextView
@@ -126,6 +130,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             Prefs.KEY_DIAMETER_DP,
             Prefs.KEY_BORDER_THICKNESS_DP,
             Prefs.KEY_START_ANGLE_DEG,
+            Prefs.KEY_CLOCKWISE,
             Prefs.KEY_COLOR,
             Prefs.KEY_BORDER_COLOR,
             Prefs.KEY_DETECTION_INFO,
@@ -290,6 +295,50 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                 onMinus = { nudgeAngle(-startAngleStep) },
                 onPlus = { nudgeAngle(startAngleStep) }
             ))
+
+            addView(labelText("Senso di rotazione"))
+            directionToggle = MaterialButtonToggleGroup(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                isSingleSelection = true
+                isSelectionRequired = true
+            }
+            counterclockwiseButton = MaterialButton(
+                context,
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                id = View.generateViewId()
+                text = "Antiorario"
+            }
+            clockwiseButton = MaterialButton(
+                context,
+                null,
+                com.google.android.material.R.attr.materialButtonOutlinedStyle
+            ).apply {
+                id = View.generateViewId()
+                text = "Orario"
+            }
+            directionToggle.addView(
+                counterclockwiseButton,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            directionToggle.addView(
+                clockwiseButton,
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            directionToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (!isChecked) return@addOnButtonCheckedListener
+                prefs.edit()
+                    .putBoolean(Prefs.KEY_CLOCKWISE, checkedId == clockwiseButton.id)
+                    .apply()
+            }
+            addView(
+                directionToggle,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            )
         }, cardParams())
 
         root.addView(colorCard(
@@ -487,6 +536,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             Prefs.KEY_START_ANGLE_DEG,
             Prefs.DEFAULT_START_ANGLE_DEG
         ).coerceIn(0f, 359f)
+        val clockwise = prefs.getBoolean(Prefs.KEY_CLOCKWISE, Prefs.DEFAULT_CLOCKWISE)
 
         if (::xSlider.isInitialized) {
             xSlider.valueTo = naturalWidthDp
@@ -495,6 +545,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             diameterSlider.value = diameter
             borderThicknessSlider.value = borderThickness
             startAngleSlider.value = startAngle
+        }
+        if (::directionToggle.isInitialized) {
+            directionToggle.check(
+                if (clockwise) clockwiseButton.id else counterclockwiseButton.id
+            )
         }
 
         if (::xLabel.isInitialized) {
