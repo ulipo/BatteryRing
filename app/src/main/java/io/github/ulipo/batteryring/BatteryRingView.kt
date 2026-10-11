@@ -2,6 +2,8 @@
 
 package io.github.ulipo.batteryring
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
@@ -13,7 +15,6 @@ import android.view.animation.LinearInterpolator
 import androidx.core.graphics.ColorUtils
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 class BatteryRingView(context: Context) : View(context) {
     private val prefs = Prefs.get(context)
@@ -37,8 +38,21 @@ class BatteryRingView(context: Context) : View(context) {
     private var chargingCycleFraction = 0f
 
     private var alertAnimator: ValueAnimator? = null
-    private var alertCycleFraction = 0f
-    private var alertPeriodMs = 0L
+    private var alertMix = 0f
+    private var alertIntervalMs = 0L
+    private var alertPulseScheduled = false
+    private var activeAlertStyle: AlertStyle? = null
+
+    private val alertRestartRunnable = Runnable {
+        alertPulseScheduled = false
+        val alert = currentAlertStyle()
+        if (alert == null || !isAttachedToWindow || windowVisibility != VISIBLE) {
+            stopAlertAnimation()
+        } else {
+            activeAlertStyle = alert
+            startAlertPulse(alert)
+        }
+    }
 
     var batteryPercent: Float = 100f
         set(value) {
@@ -117,30 +131,64 @@ class BatteryRingView(context: Context) : View(context) {
             return
         }
 
-        if (!forceRestart && alertAnimator?.isRunning == true && alertPeriodMs == alert.periodMs) {
-            return
-        }
+        val sameAlert = activeAlertStyle == alert
+        val alreadyActive = alertAnimator?.isRunning == true || alertPulseScheduled
+        if (!forceRestart && sameAlert && alreadyActive) return
 
         stopAlertAnimation()
-        alertPeriodMs = alert.periodMs
-        alertAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = alert.periodMs
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.RESTART
+        activeAlertStyle = alert
+        startAlertPulse(alert)
+    }
+
+    private fun startAlertPulse(alert: AlertStyle) {
+        if (!isAttachedToWindow || windowVisibility != VISIBLE) return
+
+        alertIntervalMs = alert.intervalMs
+        var cancelled = false
+
+        alertAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
+            duration = ALERT_PULSE_DURATION_MS
             interpolator = LinearInterpolator()
             addUpdateListener {
-                alertCycleFraction = it.animatedValue as Float
+                alertMix = (it.animatedValue as Float).coerceIn(0f, 1f)
                 postInvalidateOnAnimation()
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationCancel(animation: Animator) {
+                    cancelled = true
+                }
+
+                override fun onAnimationEnd(animation: Animator) {
+                    alertAnimator = null
+                    alertMix = 0f
+                    postInvalidateOnAnimation()
+
+                    if (!cancelled &&
+                        currentAlertStyle() != null &&
+                        isAttachedToWindow &&
+                        windowVisibility == VISIBLE
+                    ) {
+                        alertPulseScheduled = true
+                        postDelayed(alertRestartRunnable, alert.intervalMs)
+                    }
+                }
+            })
             start()
         }
     }
 
     private fun stopAlertAnimation() {
-        alertAnimator?.cancel()
+        removeCallbacks(alertRestartRunnable)
+        alertPulseScheduled = false
+        activeAlertStyle = null
+        alertIntervalMs = 0L
+
+        val animator = alertAnimator
         alertAnimator = null
-        alertCycleFraction = 0f
-        alertPeriodMs = 0L
+        animator?.cancel()
+
+        alertMix = 0f
+        invalidate()
     }
 
     private fun currentAlertStyle(): AlertStyle? {
@@ -163,11 +211,11 @@ class BatteryRingView(context: Context) : View(context) {
                     Prefs.KEY_CRITICAL_COLOR,
                     Prefs.DEFAULT_CRITICAL_COLOR
                 ),
-                periodMs = (
+                intervalMs = (
                     prefs.getFloat(
-                        Prefs.KEY_CRITICAL_PERIOD_SECONDS,
-                        Prefs.DEFAULT_CRITICAL_PERIOD_SECONDS
-                    ).coerceIn(MIN_ALERT_PERIOD_SECONDS, MAX_ALERT_PERIOD_SECONDS) * 1000f
+                        Prefs.KEY_CRITICAL_INTERVAL_SECONDS,
+                        Prefs.DEFAULT_CRITICAL_INTERVAL_SECONDS
+                    ).coerceIn(MIN_ALERT_INTERVAL_SECONDS, MAX_ALERT_INTERVAL_SECONDS) * 1000f
                 ).roundToInt().toLong()
             )
 
@@ -176,11 +224,11 @@ class BatteryRingView(context: Context) : View(context) {
                     Prefs.KEY_WARNING_COLOR,
                     Prefs.DEFAULT_WARNING_COLOR
                 ),
-                periodMs = (
+                intervalMs = (
                     prefs.getFloat(
-                        Prefs.KEY_WARNING_PERIOD_SECONDS,
-                        Prefs.DEFAULT_WARNING_PERIOD_SECONDS
-                    ).coerceIn(MIN_ALERT_PERIOD_SECONDS, MAX_ALERT_PERIOD_SECONDS) * 1000f
+                        Prefs.KEY_WARNING_INTERVAL_SECONDS,
+                        Prefs.DEFAULT_WARNING_INTERVAL_SECONDS
+                    ).coerceIn(MIN_ALERT_INTERVAL_SECONDS, MAX_ALERT_INTERVAL_SECONDS) * 1000f
                 ).roundToInt().toLong()
             )
 
@@ -276,10 +324,8 @@ class BatteryRingView(context: Context) : View(context) {
         val alert = currentAlertStyle() ?: return baseColor
         if (alertAnimator?.isRunning != true) return baseColor
 
-        // One full pulse per configured period:
-        // normal color -> alert color -> normal color.
-        val mix = sin(Math.PI * alertCycleFraction.toDouble()).toFloat().coerceIn(0f, 1f)
-        return ColorUtils.blendARGB(baseColor, alert.color, mix)
+        // The 500 ms animator directly produces normal -> alert -> normal.
+        return ColorUtils.blendARGB(baseColor, alert.color, alertMix)
     }
 
     private fun drawChargingOpacityWave(
@@ -352,7 +398,7 @@ class BatteryRingView(context: Context) : View(context) {
 
     private data class AlertStyle(
         val color: Int,
-        val periodMs: Long
+        val intervalMs: Long
     )
 
     companion object {
@@ -360,7 +406,8 @@ class BatteryRingView(context: Context) : View(context) {
         private const val CHARGING_REVEAL_PHASE = 0.70f
         private const val CHARGING_BASE_ALPHA = 96
 
-        private const val MIN_ALERT_PERIOD_SECONDS = 0.5f
-        private const val MAX_ALERT_PERIOD_SECONDS = 10f
+        private const val ALERT_PULSE_DURATION_MS = 500L
+        private const val MIN_ALERT_INTERVAL_SECONDS = 0.5f
+        private const val MAX_ALERT_INTERVAL_SECONDS = 10f
     }
 }
