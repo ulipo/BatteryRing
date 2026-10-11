@@ -9,7 +9,7 @@ L'indicatore è un settore circolare pieno: 100% = cerchio completo, 50% = mezzo
 - indicatore sempre visibile sopra la barra di stato tramite `TYPE_ACCESSIBILITY_OVERLAY`;
 - settore proporzionale in modo continuo alla percentuale di batteria;
 - animazione di ricarica: il settore diventa semitrasparente e torna progressivamente opaco con avanzamento accelerato, poi sfuma e ricomincia;
-- avvisi pulsanti configurabili per batteria bassa e critica, con soglia, colore e intervallo indipendenti;
+- colore del settore attivo pulsante tra il colore normale e quello di avviso/critico, con soglia, colore e intervallo configurabili;
 - senso di rotazione selezionabile: orario o antiorario;
 - colore di riempimento e bordo configurabili con color picker;
 - spessore bordo configurabile, con `0` = nessun bordo;
