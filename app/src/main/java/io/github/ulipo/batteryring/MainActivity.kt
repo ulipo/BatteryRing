@@ -68,6 +68,10 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private lateinit var diameterLabel: MaterialTextView
     private lateinit var borderThicknessLabel: MaterialTextView
     private lateinit var startAngleLabel: MaterialTextView
+    private lateinit var warningThresholdSlider: Slider
+    private lateinit var criticalThresholdSlider: Slider
+    private lateinit var warningThresholdLabel: MaterialTextView
+    private lateinit var criticalThresholdLabel: MaterialTextView
 
     private var batteryReceiverRegistered = false
     private var naturalWidthDp = 1f
@@ -378,13 +382,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                 }
             }, matchWrap())
 
-            addView(alertSliderRow(
+            addView(thresholdSliderRow(
                 title = "Soglia avviso",
                 prefKey = Prefs.KEY_WARNING_THRESHOLD,
                 defaultValue = Prefs.DEFAULT_WARNING_THRESHOLD,
-                valueFrom = 1f,
-                valueTo = 100f,
-                suffix = "%"
+                isCritical = false
             ))
 
             addView(alertSliderRow(
@@ -396,13 +398,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                 suffix = " s"
             ))
 
-            addView(alertSliderRow(
+            addView(thresholdSliderRow(
                 title = "Soglia critica",
                 prefKey = Prefs.KEY_CRITICAL_THRESHOLD,
                 defaultValue = Prefs.DEFAULT_CRITICAL_THRESHOLD,
-                valueFrom = 1f,
-                valueTo = 100f,
-                suffix = "%"
+                isCritical = true
             ))
 
             addView(alertSliderRow(
@@ -441,15 +441,51 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     }
 
     private fun sectionCard(title: String, contentBuilder: LinearLayout.() -> Unit): MaterialCardView {
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.VISIBLE
+            contentBuilder()
+        }
+
+        val indicator = MaterialTextView(this).apply {
+            text = "▾"
+            textSize = 18f
+            setTextColor(NordPalette.Nord4)
+        }
+
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            isClickable = true
+            isFocusable = true
+
+            addView(
+                MaterialTextView(context).apply {
+                    text = title
+                    textSize = 20f
+                    setTextColor(NordPalette.Nord6)
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            )
+            addView(indicator)
+
+            setOnClickListener {
+                val expanded = body.visibility == View.VISIBLE
+                body.visibility = if (expanded) View.GONE else View.VISIBLE
+                indicator.text = if (expanded) "▸" else "▾"
+            }
+        }
+
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            addView(MaterialTextView(context).apply {
-                text = title
-                textSize = 20f
-                setTextColor(NordPalette.Nord6)
-                setPadding(0, 0, 0, dp(12))
-            })
-            contentBuilder()
+            addView(header, matchWrap())
+            addView(
+                body,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(12) }
+            )
         }
 
         return MaterialCardView(this).apply {
@@ -582,6 +618,89 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             .show()
     }
 
+    private fun thresholdSliderRow(
+        title: String,
+        prefKey: String,
+        defaultValue: Float,
+        isCritical: Boolean
+    ): View {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+
+        val label = labelText("")
+        lateinit var slider: Slider
+
+        val warningValue = prefs.getFloat(
+            Prefs.KEY_WARNING_THRESHOLD,
+            Prefs.DEFAULT_WARNING_THRESHOLD
+        ).coerceIn(1f, 100f)
+
+        val initialValue = if (isCritical) {
+            prefs.getFloat(prefKey, defaultValue).coerceIn(1f, warningValue)
+        } else {
+            prefs.getFloat(prefKey, defaultValue).coerceIn(1f, 100f)
+        }
+
+        slider = createSlider(
+            1f,
+            if (isCritical) warningValue else 100f,
+            0f
+        ) { rawValue ->
+            if (isCritical) {
+                val warning = prefs.getFloat(
+                    Prefs.KEY_WARNING_THRESHOLD,
+                    Prefs.DEFAULT_WARNING_THRESHOLD
+                ).coerceIn(1f, 100f)
+                val value = rawValue.coerceAtMost(warning)
+                if (slider.value != value) slider.value = value
+                prefs.edit().putFloat(Prefs.KEY_CRITICAL_THRESHOLD, value).apply()
+                label.text = "$title: ${value.roundToInt()}%"
+            } else {
+                val value = rawValue.coerceIn(1f, 100f)
+                val currentCritical = prefs.getFloat(
+                    Prefs.KEY_CRITICAL_THRESHOLD,
+                    Prefs.DEFAULT_CRITICAL_THRESHOLD
+                ).coerceIn(1f, 100f)
+                val clampedCritical = currentCritical.coerceAtMost(value)
+
+                prefs.edit()
+                    .putFloat(Prefs.KEY_WARNING_THRESHOLD, value)
+                    .putFloat(Prefs.KEY_CRITICAL_THRESHOLD, clampedCritical)
+                    .apply()
+
+                label.text = "$title: ${value.roundToInt()}%"
+
+                if (::criticalThresholdSlider.isInitialized) {
+                    if (criticalThresholdSlider.value > value) {
+                        criticalThresholdSlider.value = value
+                    }
+                    criticalThresholdSlider.valueTo = value
+                }
+                if (::criticalThresholdLabel.isInitialized) {
+                    criticalThresholdLabel.text =
+                        "Soglia critica: ${clampedCritical.roundToInt()}%"
+                }
+            }
+        }
+
+        slider.value = initialValue
+        label.text = "$title: ${initialValue.roundToInt()}%"
+
+        if (isCritical) {
+            criticalThresholdSlider = slider
+            criticalThresholdLabel = label
+        } else {
+            warningThresholdSlider = slider
+            warningThresholdLabel = label
+        }
+
+        column.addView(label)
+        column.addView(slider, matchWrap())
+        return column
+    }
+
     private fun alertSliderRow(
         title: String,
         prefKey: String,
@@ -638,6 +757,21 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             Prefs.DEFAULT_START_ANGLE_DEG
         ).coerceIn(0f, 359f)
         val clockwise = prefs.getBoolean(Prefs.KEY_CLOCKWISE, Prefs.DEFAULT_CLOCKWISE)
+        val warningThreshold = prefs.getFloat(
+            Prefs.KEY_WARNING_THRESHOLD,
+            Prefs.DEFAULT_WARNING_THRESHOLD
+        ).coerceIn(1f, 100f)
+        val criticalThresholdRaw = prefs.getFloat(
+            Prefs.KEY_CRITICAL_THRESHOLD,
+            Prefs.DEFAULT_CRITICAL_THRESHOLD
+        ).coerceIn(1f, 100f)
+        val criticalThreshold = criticalThresholdRaw.coerceAtMost(warningThreshold)
+
+        if (criticalThreshold != criticalThresholdRaw) {
+            prefs.edit()
+                .putFloat(Prefs.KEY_CRITICAL_THRESHOLD, criticalThreshold)
+                .apply()
+        }
 
         if (::xSlider.isInitialized) {
             xSlider.valueTo = naturalWidthDp
@@ -651,6 +785,20 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             directionToggle.check(
                 if (clockwise) clockwiseButton.id else counterclockwiseButton.id
             )
+        }
+        if (::warningThresholdSlider.isInitialized) {
+            warningThresholdSlider.value = warningThreshold
+            warningThresholdLabel.text =
+                "Soglia avviso: ${warningThreshold.roundToInt()}%"
+        }
+        if (::criticalThresholdSlider.isInitialized) {
+            if (criticalThresholdSlider.value > warningThreshold) {
+                criticalThresholdSlider.value = criticalThreshold
+            }
+            criticalThresholdSlider.valueTo = warningThreshold
+            criticalThresholdSlider.value = criticalThreshold
+            criticalThresholdLabel.text =
+                "Soglia critica: ${criticalThreshold.roundToInt()}%"
         }
 
         if (::xLabel.isInitialized) {
