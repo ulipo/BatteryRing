@@ -108,6 +108,14 @@ class BatteryRingAccessibilityService : AccessibilityService(),
             Prefs.KEY_CLOCKWISE,
             Prefs.KEY_COLOR,
             Prefs.KEY_BORDER_COLOR -> ringView?.invalidate()
+
+            Prefs.KEY_LOW_ALERT_ENABLED,
+            Prefs.KEY_WARNING_THRESHOLD,
+            Prefs.KEY_WARNING_COLOR,
+            Prefs.KEY_WARNING_PERIOD_SECONDS,
+            Prefs.KEY_CRITICAL_THRESHOLD,
+            Prefs.KEY_CRITICAL_COLOR,
+            Prefs.KEY_CRITICAL_PERIOD_SECONDS -> ringView?.refreshAlertAnimation()
             // Detection diagnostics and unrelated preferences do not affect drawing.
         }
     }
