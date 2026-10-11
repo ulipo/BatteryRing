@@ -542,7 +542,12 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
 
             row.addView(MaterialButton(context).apply {
                 text = "Scegli colore"
-                setOnClickListener { showColorPicker(title, prefKey) }
+                setOnClickListener {
+                    showColorPicker(title, prefKey) { color ->
+                        swatch.setCardBackgroundColor(color)
+                        valueText.text = colorHex(color)
+                    }
+                }
             })
             addView(row, matchWrap())
 
@@ -567,7 +572,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                     strokeWidth = dp(1)
                     strokeColor = ColorStateList.valueOf(NordPalette.Nord3)
                     backgroundTintList = ColorStateList.valueOf(color)
-                    setOnClickListener { prefs.edit().putInt(prefKey, color).apply() }
+                    setOnClickListener {
+                        prefs.edit().putInt(prefKey, color).apply()
+                        swatch.setCardBackgroundColor(color)
+                        valueText.text = colorHex(color)
+                    }
                 }, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(8) })
             }
             scroller.addView(
@@ -581,7 +590,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         }
     }
 
-    private fun showColorPicker(title: String, prefKey: String) {
+    private fun showColorPicker(
+        title: String,
+        prefKey: String,
+        onApplied: (Int) -> Unit = {}
+    ) {
         val current = prefs.getInt(prefKey, defaultColorFor(prefKey))
         val picker = NordColorPickerView(this).apply {
             setColor(current)
@@ -613,7 +626,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             .setView(content)
             .setNegativeButton("Annulla", null)
             .setPositiveButton("Applica") { _, _ ->
-                prefs.edit().putInt(prefKey, picker.selectedColor).apply()
+                val color = picker.selectedColor
+                prefs.edit().putInt(prefKey, color).apply()
+                onApplied(color)
             }
             .show()
     }
