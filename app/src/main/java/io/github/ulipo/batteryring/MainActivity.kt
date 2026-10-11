@@ -133,6 +133,13 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             Prefs.KEY_CLOCKWISE,
             Prefs.KEY_COLOR,
             Prefs.KEY_BORDER_COLOR,
+            Prefs.KEY_LOW_ALERT_ENABLED,
+            Prefs.KEY_WARNING_THRESHOLD,
+            Prefs.KEY_WARNING_COLOR,
+            Prefs.KEY_WARNING_PERIOD_SECONDS,
+            Prefs.KEY_CRITICAL_THRESHOLD,
+            Prefs.KEY_CRITICAL_COLOR,
+            Prefs.KEY_CRITICAL_PERIOD_SECONDS,
             Prefs.KEY_DETECTION_INFO,
             Prefs.KEY_ENABLED -> syncControlsFromPrefs()
         }
@@ -359,6 +366,69 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             }
         ), cardParams())
 
+        root.addView(sectionCard("Avvisi batteria scarica") {
+            addView(MaterialSwitch(context).apply {
+                text = "Abilita pulsazione batteria scarica"
+                isChecked = prefs.getBoolean(
+                    Prefs.KEY_LOW_ALERT_ENABLED,
+                    Prefs.DEFAULT_LOW_ALERT_ENABLED
+                )
+                setOnCheckedChangeListener { _, checked ->
+                    prefs.edit().putBoolean(Prefs.KEY_LOW_ALERT_ENABLED, checked).apply()
+                }
+            }, matchWrap())
+
+            addView(alertSliderRow(
+                title = "Soglia avviso",
+                prefKey = Prefs.KEY_WARNING_THRESHOLD,
+                defaultValue = Prefs.DEFAULT_WARNING_THRESHOLD,
+                valueFrom = 1f,
+                valueTo = 100f,
+                suffix = "%"
+            ))
+
+            addView(alertSliderRow(
+                title = "Periodo avviso",
+                prefKey = Prefs.KEY_WARNING_PERIOD_SECONDS,
+                defaultValue = Prefs.DEFAULT_WARNING_PERIOD_SECONDS,
+                valueFrom = 0.5f,
+                valueTo = 10f,
+                suffix = " s"
+            ))
+
+            addView(alertSliderRow(
+                title = "Soglia critica",
+                prefKey = Prefs.KEY_CRITICAL_THRESHOLD,
+                defaultValue = Prefs.DEFAULT_CRITICAL_THRESHOLD,
+                valueFrom = 1f,
+                valueTo = 100f,
+                suffix = "%"
+            ))
+
+            addView(alertSliderRow(
+                title = "Periodo critico",
+                prefKey = Prefs.KEY_CRITICAL_PERIOD_SECONDS,
+                defaultValue = Prefs.DEFAULT_CRITICAL_PERIOD_SECONDS,
+                valueFrom = 0.5f,
+                valueTo = 10f,
+                suffix = " s"
+            ))
+
+            addView(supportingText(
+                "Il livello critico ha priorità sull'avviso quando entrambe le soglie sono soddisfatte."
+            ))
+        }, cardParams())
+
+        root.addView(colorCard(
+            title = "Colore avviso batteria",
+            prefKey = Prefs.KEY_WARNING_COLOR
+        ), cardParams())
+
+        root.addView(colorCard(
+            title = "Colore batteria critica",
+            prefKey = Prefs.KEY_CRITICAL_COLOR
+        ), cardParams())
+
         root.addView(sectionCard("Informazioni") {
             addView(supportingText(
                 "Il servizio di accessibilità viene usato esclusivamente per disegnare " +
@@ -396,7 +466,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun colorCard(
         title: String,
         prefKey: String,
-        onReady: (MaterialCardView, MaterialTextView) -> Unit
+        onReady: (MaterialCardView, MaterialTextView) -> Unit = { _, _ -> }
     ): MaterialCardView {
         val presetColors = listOf(
             Color.WHITE,
@@ -409,10 +479,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         )
 
         return sectionCard(title) {
-            val current = prefs.getInt(
-                prefKey,
-                if (prefKey == Prefs.KEY_COLOR) Prefs.DEFAULT_COLOR else Prefs.DEFAULT_BORDER_COLOR
-            )
+            val current = prefs.getInt(prefKey, defaultColorFor(prefKey))
 
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -479,10 +546,7 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     }
 
     private fun showColorPicker(title: String, prefKey: String) {
-        val current = prefs.getInt(
-            prefKey,
-            if (prefKey == Prefs.KEY_COLOR) Prefs.DEFAULT_COLOR else Prefs.DEFAULT_BORDER_COLOR
-        )
+        val current = prefs.getInt(prefKey, defaultColorFor(prefKey))
         val picker = NordColorPickerView(this).apply {
             setColor(current)
         }
@@ -517,6 +581,43 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             }
             .show()
     }
+
+    private fun alertSliderRow(
+        title: String,
+        prefKey: String,
+        defaultValue: Float,
+        valueFrom: Float,
+        valueTo: Float,
+        suffix: String
+    ): View {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(6), 0, dp(6))
+        }
+        val label = labelText("")
+        val slider = createSlider(valueFrom, valueTo, 0f) { value ->
+            prefs.edit().putFloat(prefKey, value).apply()
+            label.text = "$title: ${formatAlertValue(value, suffix)}"
+        }
+        val current = prefs.getFloat(prefKey, defaultValue).coerceIn(valueFrom, valueTo)
+        slider.value = current
+        label.text = "$title: ${formatAlertValue(current, suffix)}"
+        column.addView(label)
+        column.addView(slider, matchWrap())
+        return column
+    }
+
+    private fun defaultColorFor(prefKey: String): Int = when (prefKey) {
+        Prefs.KEY_COLOR -> Prefs.DEFAULT_COLOR
+        Prefs.KEY_BORDER_COLOR -> Prefs.DEFAULT_BORDER_COLOR
+        Prefs.KEY_WARNING_COLOR -> Prefs.DEFAULT_WARNING_COLOR
+        Prefs.KEY_CRITICAL_COLOR -> Prefs.DEFAULT_CRITICAL_COLOR
+        else -> Prefs.DEFAULT_COLOR
+    }
+
+    private fun formatAlertValue(value: Float, suffix: String): String =
+        if (suffix == "%") "${value.roundToInt()}$suffix"
+        else String.format("%.1f%s", value, suffix)
 
     private fun syncControlsFromPrefs() {
         naturalWidthDp = naturalDisplayWidthDp().coerceAtLeast(1f)
