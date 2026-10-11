@@ -112,10 +112,10 @@ class BatteryRingAccessibilityService : AccessibilityService(),
             Prefs.KEY_LOW_ALERT_ENABLED,
             Prefs.KEY_WARNING_THRESHOLD,
             Prefs.KEY_WARNING_COLOR,
-            Prefs.KEY_WARNING_PERIOD_SECONDS,
+            Prefs.KEY_WARNING_INTERVAL_SECONDS,
             Prefs.KEY_CRITICAL_THRESHOLD,
             Prefs.KEY_CRITICAL_COLOR,
-            Prefs.KEY_CRITICAL_PERIOD_SECONDS -> ringView?.refreshAlertAnimation()
+            Prefs.KEY_CRITICAL_INTERVAL_SECONDS -> ringView?.refreshAlertAnimation()
             // Detection diagnostics and unrelated preferences do not affect drawing.
         }
     }
