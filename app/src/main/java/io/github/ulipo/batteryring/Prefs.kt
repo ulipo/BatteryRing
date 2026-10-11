@@ -18,6 +18,14 @@ object Prefs {
     const val KEY_START_ANGLE_DEG = "start_angle_deg"
     const val KEY_CLOCKWISE = "clockwise"
 
+    const val KEY_LOW_ALERT_ENABLED = "low_alert_enabled"
+    const val KEY_WARNING_THRESHOLD = "warning_threshold"
+    const val KEY_WARNING_COLOR = "warning_color"
+    const val KEY_WARNING_PERIOD_SECONDS = "warning_period_seconds"
+    const val KEY_CRITICAL_THRESHOLD = "critical_threshold"
+    const val KEY_CRITICAL_COLOR = "critical_color"
+    const val KEY_CRITICAL_PERIOD_SECONDS = "critical_period_seconds"
+
     const val KEY_DETECT_REQUEST_ID = "detect_request_id"
     const val KEY_DETECTION_INFO = "detection_info"
 
@@ -25,8 +33,17 @@ object Prefs {
     const val DEFAULT_START_ANGLE_DEG = 0f
     const val DEFAULT_CLOCKWISE = false
     const val DEFAULT_BORDER_THICKNESS_DP = 0f
+
+    const val DEFAULT_LOW_ALERT_ENABLED = true
+    const val DEFAULT_WARNING_THRESHOLD = 25f
+    const val DEFAULT_WARNING_PERIOD_SECONDS = 3f
+    const val DEFAULT_CRITICAL_THRESHOLD = 10f
+    const val DEFAULT_CRITICAL_PERIOD_SECONDS = 1f
+
     val DEFAULT_COLOR: Int = NordPalette.Nord14
     val DEFAULT_BORDER_COLOR: Int = NordPalette.Nord6
+    val DEFAULT_WARNING_COLOR: Int = NordPalette.Nord13
+    val DEFAULT_CRITICAL_COLOR: Int = NordPalette.Nord11
 
     fun get(context: Context): SharedPreferences =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE)
