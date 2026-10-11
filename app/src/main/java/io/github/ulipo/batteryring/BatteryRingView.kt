@@ -148,14 +148,14 @@ class BatteryRingView(context: Context) : View(context) {
             return null
         }
 
-        val criticalThreshold = prefs.getFloat(
-            Prefs.KEY_CRITICAL_THRESHOLD,
-            Prefs.DEFAULT_CRITICAL_THRESHOLD
-        ).coerceIn(1f, 100f)
         val warningThreshold = prefs.getFloat(
             Prefs.KEY_WARNING_THRESHOLD,
             Prefs.DEFAULT_WARNING_THRESHOLD
         ).coerceIn(1f, 100f)
+        val criticalThreshold = prefs.getFloat(
+            Prefs.KEY_CRITICAL_THRESHOLD,
+            Prefs.DEFAULT_CRITICAL_THRESHOLD
+        ).coerceIn(1f, warningThreshold)
 
         return when {
             batteryPercent <= criticalThreshold -> AlertStyle(
