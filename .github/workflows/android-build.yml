@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [ "main", "master" ]
-  pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -76,3 +78,7 @@ jobs:
         with:
           name: BatteryRing-${{ github.run_number }}
           path: dist/*.apk
+
+      - name: Remove temporary signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/batteryring-release.jks"
