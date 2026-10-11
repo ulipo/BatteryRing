@@ -1,40 +1,52 @@
-# BatteryRing persistent signing
+# BatteryRing signing
 
-BatteryRing's GitHub Actions workflow builds both debug and release APKs with the same permanent signing certificate. This makes successive APKs update-compatible, provided the same keystore is kept and the application ID is unchanged.
+BatteryRing usa una chiave di firma persistente per tutte le build release pubblicate. La chiave privata **non è conservata nel repository**.
 
-## One-time setup
+## Come funziona
 
-From the repository root, run:
+GitHub Actions riceve il keystore tramite secret, lo ricostruisce solo nel filesystem temporaneo del runner, firma l'APK e poi lo elimina.
+
+I secret richiesti sono:
+
+- `BATTERYRING_KEYSTORE_BASE64`
+- `BATTERYRING_STORE_PASSWORD`
+- `BATTERYRING_KEY_ALIAS`
+- `BATTERYRING_KEY_PASSWORD`
+
+Il workflow firma soltanto la build **release**.
+
+## Sicurezza
+
+Nel repository sono esclusi tramite `.gitignore`:
+
+- `*.jks`
+- `*.keystore`
+- `*.p12`
+- `keystore.properties`
+- copie `*.base64`
+
+Il workflow:
+
+- usa un token GitHub Actions con permesso `contents: read`;
+- non esegue la firma su eventi `pull_request`;
+- ricostruisce il keystore esclusivamente in `$RUNNER_TEMP`;
+- imposta permessi file `600`;
+- elimina il keystore temporaneo con uno step `if: always()`.
+
+## Backup
+
+Conserva una copia offline del keystore originale in un luogo sicuro. Se la chiave viene persa, non sarà possibile distribuire APK aggiornabili sopra le versioni già installate con quella firma.
+
+## Build locale
+
+Per una release firmata in locale puoi usare un file `keystore.properties` non tracciato da Git oppure le stesse variabili d'ambiente usate dalla CI.
+
+Esempio:
 
 ```bash
-./tools/create-signing-key.sh
+gradle :app:assembleRelease
 ```
 
-The script creates three local, ignored files:
+## Ulteriore hardening consigliato
 
-- `batteryring-release.jks` — the permanent private signing key.
-- `keystore.properties` — local Gradle signing configuration.
-- `batteryring-release.jks.base64` — convenient encoded copy for GitHub Secrets.
-
-Back up `batteryring-release.jks` somewhere safe. Do not commit or publish any of these files.
-
-## GitHub secrets
-
-Open the repository on GitHub and go to **Settings → Secrets and variables → Actions → New repository secret**. Create:
-
-- `BATTERYRING_KEYSTORE_BASE64`: complete contents of `batteryring-release.jks.base64`
-- `BATTERYRING_STORE_PASSWORD`: keystore password
-- `BATTERYRING_KEY_ALIAS`: `batteryring`
-- `BATTERYRING_KEY_PASSWORD`: key password
-
-The workflow reconstructs the keystore only inside the temporary GitHub runner, signs both APKs with it, then uploads the APKs as build artifacts.
-
-## Local builds
-
-When `keystore.properties` exists, both local debug and release APKs use the same BatteryRing certificate:
-
-```bash
-gradle :app:assembleDebug :app:assembleRelease
-```
-
-If `keystore.properties` does not exist, Gradle can still make an ordinary local debug build using the standard Android debug key. CI, however, refuses to build unless the permanent key is configured, so published GitHub artifacts cannot accidentally change signature.
+Per proteggere ulteriormente la chiave puoi spostare i quattro secret in un **GitHub Environment** dedicato, ad esempio `release`, e applicare regole di protezione/approvazione all'Environment. Il workflow potrà poi usare quell'Environment senza cambiare la firma dell'app.
