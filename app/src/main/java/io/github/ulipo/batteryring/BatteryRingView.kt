@@ -10,6 +10,7 @@ import android.graphics.RectF
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.LinearInterpolator
+import androidx.core.graphics.ColorUtils
 import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -22,10 +23,6 @@ class BatteryRingView(context: Context) : View(context) {
     }
 
     private val chargingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-    }
-
-    private val alertPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
 
@@ -217,8 +214,9 @@ class BatteryRingView(context: Context) : View(context) {
         val effectiveRadius = (radius - borderWidthPx / 2f).coerceAtLeast(1f)
 
         val fillColor = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
-        fillPaint.color = fillColor
-        chargingPaint.color = fillColor
+        val animatedFillColor = currentAnimatedFillColor(fillColor)
+        fillPaint.color = animatedFillColor
+        chargingPaint.color = animatedFillColor
 
         borderPaint.strokeWidth = borderWidthPx
         borderPaint.color = prefs.getInt(
@@ -258,8 +256,6 @@ class BatteryRingView(context: Context) : View(context) {
             )
         }
 
-        drawLowBatteryPulse(canvas, cx, cy, effectiveRadius)
-
         // Draw the border last so it remains crisp above both animations.
         if (borderWidthPx > 0f && sweep > 0f) {
             if (sweep >= 360f) {
@@ -276,21 +272,14 @@ class BatteryRingView(context: Context) : View(context) {
         }
     }
 
-    private fun drawLowBatteryPulse(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        effectiveRadius: Float
-    ) {
-        val alert = currentAlertStyle() ?: return
-        if (alertAnimator?.isRunning != true) return
+    private fun currentAnimatedFillColor(baseColor: Int): Int {
+        val alert = currentAlertStyle() ?: return baseColor
+        if (alertAnimator?.isRunning != true) return baseColor
 
-        // One complete pulse per configured period: invisible -> translucent -> invisible.
-        val wave = sin(Math.PI * alertCycleFraction.toDouble()).toFloat().coerceIn(0f, 1f)
-        alertPaint.color = alert.color
-        alertPaint.alpha = (ALERT_MAX_ALPHA * wave).roundToInt().coerceIn(0, 255)
-
-        canvas.drawCircle(cx, cy, effectiveRadius, alertPaint)
+        // One full pulse per configured period:
+        // normal color -> alert color -> normal color.
+        val mix = sin(Math.PI * alertCycleFraction.toDouble()).toFloat().coerceIn(0f, 1f)
+        return ColorUtils.blendARGB(baseColor, alert.color, mix)
     }
 
     private fun drawChargingOpacityWave(
@@ -371,7 +360,6 @@ class BatteryRingView(context: Context) : View(context) {
         private const val CHARGING_REVEAL_PHASE = 0.70f
         private const val CHARGING_BASE_ALPHA = 96
 
-        private const val ALERT_MAX_ALPHA = 128f
         private const val MIN_ALERT_PERIOD_SECONDS = 0.5f
         private const val MAX_ALERT_PERIOD_SECONDS = 10f
     }
