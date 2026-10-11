@@ -140,10 +140,10 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             Prefs.KEY_LOW_ALERT_ENABLED,
             Prefs.KEY_WARNING_THRESHOLD,
             Prefs.KEY_WARNING_COLOR,
-            Prefs.KEY_WARNING_PERIOD_SECONDS,
+            Prefs.KEY_WARNING_INTERVAL_SECONDS,
             Prefs.KEY_CRITICAL_THRESHOLD,
             Prefs.KEY_CRITICAL_COLOR,
-            Prefs.KEY_CRITICAL_PERIOD_SECONDS,
+            Prefs.KEY_CRITICAL_INTERVAL_SECONDS,
             Prefs.KEY_DETECTION_INFO,
             Prefs.KEY_ENABLED -> syncControlsFromPrefs()
         }
@@ -390,9 +390,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             ))
 
             addView(alertSliderRow(
-                title = "Periodo avviso",
-                prefKey = Prefs.KEY_WARNING_PERIOD_SECONDS,
-                defaultValue = Prefs.DEFAULT_WARNING_PERIOD_SECONDS,
+                title = "Intervallo avviso",
+                prefKey = Prefs.KEY_WARNING_INTERVAL_SECONDS,
+                defaultValue = Prefs.DEFAULT_WARNING_INTERVAL_SECONDS,
                 valueFrom = 0.5f,
                 valueTo = 10f,
                 suffix = " s"
@@ -406,16 +406,18 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             ))
 
             addView(alertSliderRow(
-                title = "Periodo critico",
-                prefKey = Prefs.KEY_CRITICAL_PERIOD_SECONDS,
-                defaultValue = Prefs.DEFAULT_CRITICAL_PERIOD_SECONDS,
+                title = "Intervallo critico",
+                prefKey = Prefs.KEY_CRITICAL_INTERVAL_SECONDS,
+                defaultValue = Prefs.DEFAULT_CRITICAL_INTERVAL_SECONDS,
                 valueFrom = 0.5f,
                 valueTo = 10f,
                 suffix = " s"
             ))
 
             addView(supportingText(
-                "Il livello critico ha priorità sull'avviso quando entrambe le soglie sono soddisfatte."
+                "Ogni pulsazione dura 500 ms. Gli intervalli indicano la pausa tra la fine " +
+                    "di una pulsazione e l'inizio della successiva. Il livello critico ha " +
+                    "priorità sull'avviso quando entrambe le soglie sono soddisfatte."
             ))
         }, cardParams())
 
