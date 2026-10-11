@@ -12,6 +12,7 @@ import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.graphics.Rect
+import android.os.BatteryManager
 import android.os.Build
 import android.os.PowerManager
 import android.view.Gravity
@@ -38,6 +39,7 @@ class BatteryRingAccessibilityService : AccessibilityService(),
     private var screenReceiverRegistered = false
     private var screenInteractive = true
     private var lastBatteryPercent = -1f
+    private var lastCharging = false
 
     private val batteryReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -144,6 +146,7 @@ class BatteryRingAccessibilityService : AccessibilityService(),
 
         try {
             view.batteryPercent = if (lastBatteryPercent >= 0f) lastBatteryPercent else 100f
+            view.isCharging = lastCharging
             windowManager.addView(view, params)
             ringView = view
             ringLayoutParams = params
@@ -203,6 +206,7 @@ class BatteryRingAccessibilityService : AccessibilityService(),
 
     private fun hideOverlay() {
         val view = ringView ?: return
+        view.isCharging = false
         try {
             windowManager.removeView(view)
         } catch (_: Exception) {
@@ -447,8 +451,18 @@ class BatteryRingAccessibilityService : AccessibilityService(),
     }
 
     private fun updateBatteryFromIntent(intent: Intent) {
-        val level = intent.getIntExtra("level", -1)
-        val scale = intent.getIntExtra("scale", -1)
+        val status = intent.getIntExtra(
+            BatteryManager.EXTRA_STATUS,
+            BatteryManager.BATTERY_STATUS_UNKNOWN
+        )
+        val charging = status == BatteryManager.BATTERY_STATUS_CHARGING
+        if (charging != lastCharging) {
+            lastCharging = charging
+            ringView?.isCharging = charging
+        }
+
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
         if (level < 0 || scale <= 0) return
 
         val percent = level * 100f / scale.toFloat()
