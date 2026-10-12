@@ -151,7 +151,7 @@ class BatteryRingView(context: Context) : View(context) {
 
         alertAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = when (alert.kind) {
-                AlertKind.WARNING -> WARNING_FADE_MS
+                AlertKind.WARNING -> WARNING_EFFECT_MS
                 AlertKind.CRITICAL -> CRITICAL_EFFECT_MS
             }
             interpolator = LinearInterpolator()
@@ -159,8 +159,16 @@ class BatteryRingView(context: Context) : View(context) {
                 val elapsedMs = it.animatedFraction * duration.toFloat()
                 alertMix = when (alert.kind) {
                     AlertKind.WARNING -> {
-                        // Warning: alert color appears immediately, then fades to normal.
-                        (1f - elapsedMs / WARNING_FADE_MS).coerceIn(0f, 1f)
+                        // Warning: hold the full alert color briefly, then fade to normal.
+                        if (elapsedMs < WARNING_HOLD_MS) {
+                            1f
+                        } else {
+                            (
+                                1f -
+                                    (elapsedMs - WARNING_HOLD_MS) /
+                                    WARNING_FADE_MS
+                                ).coerceIn(0f, 1f)
+                        }
                     }
                     AlertKind.CRITICAL -> {
                         // Critical: first short flash, tiny gap, second abrupt flash,
@@ -464,11 +472,13 @@ class BatteryRingView(context: Context) : View(context) {
         private const val CHARGING_REVEAL_PHASE = 0.70f
         private const val CHARGING_BASE_ALPHA = 96
 
+        private const val WARNING_HOLD_MS = 100L
         private const val WARNING_FADE_MS = 500L
+        private const val WARNING_EFFECT_MS = WARNING_HOLD_MS + WARNING_FADE_MS
 
         private const val CRITICAL_FIRST_FLASH_MS = 60L
         private const val CRITICAL_SECOND_FLASH_START_MS = 120L
-        private const val CRITICAL_FADE_START_MS = 180L
+        private const val CRITICAL_FADE_START_MS = 220L
         private const val CRITICAL_FADE_MS = 500L
         private const val CRITICAL_EFFECT_MS =
             CRITICAL_FADE_START_MS + CRITICAL_FADE_MS
