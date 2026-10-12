@@ -168,9 +168,10 @@ class BatteryRingView(context: Context) : View(context) {
                         when {
                             elapsedMs < CRITICAL_FIRST_FLASH_MS -> 1f
                             elapsedMs < CRITICAL_SECOND_FLASH_START_MS -> 0f
+                            elapsedMs < CRITICAL_FADE_START_MS -> 1f
                             else -> (
                                 1f -
-                                    (elapsedMs - CRITICAL_SECOND_FLASH_START_MS) /
+                                    (elapsedMs - CRITICAL_FADE_START_MS) /
                                     CRITICAL_FADE_MS
                                 ).coerceIn(0f, 1f)
                         }
@@ -467,9 +468,10 @@ class BatteryRingView(context: Context) : View(context) {
 
         private const val CRITICAL_FIRST_FLASH_MS = 60L
         private const val CRITICAL_SECOND_FLASH_START_MS = 120L
+        private const val CRITICAL_FADE_START_MS = 180L
         private const val CRITICAL_FADE_MS = 500L
         private const val CRITICAL_EFFECT_MS =
-            CRITICAL_SECOND_FLASH_START_MS + CRITICAL_FADE_MS
+            CRITICAL_FADE_START_MS + CRITICAL_FADE_MS
 
         private const val MIN_ALERT_INTERVAL_SECONDS = 0.5f
         private const val MAX_ALERT_INTERVAL_SECONDS = 10f
