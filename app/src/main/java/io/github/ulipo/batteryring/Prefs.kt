@@ -25,6 +25,7 @@ object Prefs {
     const val KEY_CRITICAL_THRESHOLD = "critical_threshold"
     const val KEY_CRITICAL_COLOR = "critical_color"
     const val KEY_CRITICAL_INTERVAL_SECONDS = "critical_period_seconds"
+    const val KEY_SECTION_COLLAPSED_PREFIX = "section_collapsed_"
 
     const val KEY_DETECT_REQUEST_ID = "detect_request_id"
     const val KEY_DETECTION_INFO = "detection_info"
