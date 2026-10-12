@@ -33,8 +33,8 @@ android {
         applicationId = "io.github.ulipo.batteryring"
         minSdk = 26
         targetSdk = 36
-        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 16
-        versionName = System.getenv("VERSION_NAME") ?: "1.6.4"
+        versionCode = System.getenv("BUILD_NUMBER")?.toIntOrNull() ?: 17
+        versionName = System.getenv("VERSION_NAME") ?: "1.6.5"
     }
 
     signingConfigs {
