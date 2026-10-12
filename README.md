@@ -9,14 +9,14 @@ L'indicatore è un settore circolare pieno: 100% = cerchio completo, 50% = mezzo
 - indicatore sempre visibile sopra la barra di stato tramite `TYPE_ACCESSIBILITY_OVERLAY`;
 - settore proporzionale in modo continuo alla percentuale di batteria;
 - animazione di ricarica: il settore diventa semitrasparente e torna progressivamente opaco con avanzamento accelerato, poi sfuma e ricomincia;
-- colore del settore attivo pulsante tra il colore normale e quello di avviso/critico: ogni pulsazione dura 500 ms e la pausa tra le pulsazioni è configurabile;
+- avvisi colore differenziati: sotto la soglia di avviso il colore compare e sfuma in 300 ms; sotto la soglia critica esegue due impulsi ravvicinati e poi sfuma in 300 ms;
 - senso di rotazione selezionabile: orario o antiorario;
 - colore di riempimento e bordo configurabili con color picker;
 - spessore bordo configurabile, con `0` = nessun bordo;
 - calibrazione fine di posizione e diametro;
 - rilevamento automatico del `DisplayCutout` quando disponibile;
 - gestione corretta di portrait e landscape;
-- interfaccia Material 3 con palette Nord;
+- interfaccia Material 3 con palette Nord e sezioni collassabili con stato persistente;
 - nessun polling continuo della batteria;
 - overlay compatto e sospensione a schermo spento per ridurre i consumi.
 
