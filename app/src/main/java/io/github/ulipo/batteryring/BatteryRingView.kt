@@ -12,7 +12,6 @@ import android.graphics.RectF
 import android.view.View
 import android.view.animation.AccelerateInterpolator
 import android.view.animation.LinearInterpolator
-import androidx.core.graphics.ColorUtils
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -24,6 +23,10 @@ class BatteryRingView(context: Context) : View(context) {
     }
 
     private val chargingPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+    }
+
+    private val alertPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
     }
 
@@ -161,7 +164,7 @@ class BatteryRingView(context: Context) : View(context) {
                     }
                     AlertKind.CRITICAL -> {
                         // Critical: first short flash, tiny gap, second abrupt flash,
-                        // then a 300 ms fade back to the normal ring color.
+                        // then a 500 ms fade back to the normal ring color.
                         when {
                             elapsedMs < CRITICAL_FIRST_FLASH_MS -> 1f
                             elapsedMs < CRITICAL_SECOND_FLASH_START_MS -> 0f
@@ -285,9 +288,8 @@ class BatteryRingView(context: Context) : View(context) {
         val effectiveRadius = (radius - borderWidthPx / 2f).coerceAtLeast(1f)
 
         val fillColor = prefs.getInt(Prefs.KEY_COLOR, Prefs.DEFAULT_COLOR)
-        val animatedFillColor = currentAnimatedFillColor(fillColor)
-        fillPaint.color = animatedFillColor
-        chargingPaint.color = animatedFillColor
+        fillPaint.color = fillColor
+        chargingPaint.color = fillColor
 
         borderPaint.strokeWidth = borderWidthPx
         borderPaint.color = prefs.getInt(
@@ -327,6 +329,15 @@ class BatteryRingView(context: Context) : View(context) {
             )
         }
 
+        drawAlertOverlay(
+            canvas = canvas,
+            cx = cx,
+            cy = cy,
+            sweep = sweep,
+            signedSweep = signedSweep,
+            originDeg = originDeg
+        )
+
         // Draw the border last so it remains crisp above both animations.
         if (borderWidthPx > 0f && sweep > 0f) {
             if (sweep >= 360f) {
@@ -343,11 +354,29 @@ class BatteryRingView(context: Context) : View(context) {
         }
     }
 
-    private fun currentAnimatedFillColor(baseColor: Int): Int {
-        val alert = currentAlertStyle() ?: return baseColor
-        if (alertAnimator?.isRunning != true) return baseColor
+    private fun drawAlertOverlay(
+        canvas: Canvas,
+        cx: Float,
+        cy: Float,
+        sweep: Float,
+        signedSweep: Float,
+        originDeg: Float
+    ) {
+        val alert = activeAlertStyle ?: return
+        if (alertAnimator?.isRunning != true || alertMix <= 0f || sweep <= 0f) return
 
-        return ColorUtils.blendARGB(baseColor, alert.color, alertMix)
+        alertPaint.color = alert.color
+        alertPaint.alpha = (255f * alertMix).roundToInt().coerceIn(0, 255)
+
+        drawSector(
+            canvas = canvas,
+            cx = cx,
+            cy = cy,
+            sweep = sweep,
+            signedSweep = signedSweep,
+            originDeg = originDeg,
+            paint = alertPaint
+        )
     }
 
     private fun drawChargingOpacityWave(
@@ -434,11 +463,11 @@ class BatteryRingView(context: Context) : View(context) {
         private const val CHARGING_REVEAL_PHASE = 0.70f
         private const val CHARGING_BASE_ALPHA = 96
 
-        private const val WARNING_FADE_MS = 300L
+        private const val WARNING_FADE_MS = 500L
 
         private const val CRITICAL_FIRST_FLASH_MS = 60L
         private const val CRITICAL_SECOND_FLASH_START_MS = 120L
-        private const val CRITICAL_FADE_MS = 300L
+        private const val CRITICAL_FADE_MS = 500L
         private const val CRITICAL_EFFECT_MS =
             CRITICAL_SECOND_FLASH_START_MS + CRITICAL_FADE_MS
 
