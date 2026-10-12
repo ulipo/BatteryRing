@@ -415,9 +415,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             ))
 
             addView(supportingText(
-                "Ogni pulsazione dura 500 ms. Gli intervalli indicano la pausa tra la fine " +
-                    "di una pulsazione e l'inizio della successiva. Il livello critico ha " +
-                    "priorità sull'avviso quando entrambe le soglie sono soddisfatte."
+                "Avviso: comparsa immediata e dissolvenza in 300 ms. Critica: due impulsi " +
+                    "ravvicinati e dissolvenza finale in 300 ms. Gli intervalli indicano la " +
+                    "pausa tra la fine dell'effetto e l'inizio del successivo."
             ))
         }, cardParams())
 
@@ -443,14 +443,17 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
     }
 
     private fun sectionCard(title: String, contentBuilder: LinearLayout.() -> Unit): MaterialCardView {
+        val collapseKey = Prefs.KEY_SECTION_COLLAPSED_PREFIX + sectionKey(title)
+        var collapsed = prefs.getBoolean(collapseKey, false)
+
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            visibility = View.VISIBLE
+            visibility = if (collapsed) View.GONE else View.VISIBLE
             contentBuilder()
         }
 
         val indicator = MaterialTextView(this).apply {
-            text = "▾"
+            text = if (collapsed) "▸" else "▾"
             textSize = 18f
             setTextColor(NordPalette.Nord4)
         }
@@ -472,9 +475,10 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             addView(indicator)
 
             setOnClickListener {
-                val expanded = body.visibility == View.VISIBLE
-                body.visibility = if (expanded) View.GONE else View.VISIBLE
-                indicator.text = if (expanded) "▸" else "▾"
+                collapsed = body.visibility == View.VISIBLE
+                body.visibility = if (collapsed) View.GONE else View.VISIBLE
+                indicator.text = if (collapsed) "▸" else "▾"
+                prefs.edit().putBoolean(collapseKey, collapsed).apply()
             }
         }
 
@@ -500,6 +504,11 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             addView(content, matchWrap())
         }
     }
+
+    private fun sectionKey(title: String): String =
+        title.lowercase()
+            .replace(Regex("[^a-z0-9]+"), "_")
+            .trim('_')
 
     private fun colorCard(
         title: String,
