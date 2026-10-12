@@ -350,25 +350,25 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
             )
+
+            addView(colorControls(
+                title = "Riempimento",
+                prefKey = Prefs.KEY_COLOR,
+                onReady = { swatch, value ->
+                    fillColorSwatch = swatch
+                    fillColorValue = value
+                }
+            ))
+
+            addView(colorControls(
+                title = "Bordo",
+                prefKey = Prefs.KEY_BORDER_COLOR,
+                onReady = { swatch, value ->
+                    borderColorSwatch = swatch
+                    borderColorValue = value
+                }
+            ))
         }, cardParams())
-
-        root.addView(colorCard(
-            title = "Riempimento",
-            prefKey = Prefs.KEY_COLOR,
-            onReady = { swatch, value ->
-                fillColorSwatch = swatch
-                fillColorValue = value
-            }
-        ), cardParams())
-
-        root.addView(colorCard(
-            title = "Bordo",
-            prefKey = Prefs.KEY_BORDER_COLOR,
-            onReady = { swatch, value ->
-                borderColorSwatch = swatch
-                borderColorValue = value
-            }
-        ), cardParams())
 
         root.addView(sectionCard("Avvisi batteria scarica") {
             addView(MaterialSwitch(context).apply {
@@ -415,8 +415,8 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             ))
 
             addView(supportingText(
-                "Avviso: comparsa immediata e dissolvenza in 300 ms. Critica: due impulsi " +
-                    "ravvicinati e dissolvenza finale in 300 ms. Gli intervalli indicano la " +
+                "Avviso: comparsa immediata e dissolvenza in 500 ms. Critica: due impulsi " +
+                    "ravvicinati e dissolvenza finale in 500 ms. Gli intervalli indicano la " +
                     "pausa tra la fine dell'effetto e l'inizio del successivo."
             ))
         }, cardParams())
@@ -514,7 +514,15 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
         title: String,
         prefKey: String,
         onReady: (MaterialCardView, MaterialTextView) -> Unit = { _, _ -> }
-    ): MaterialCardView {
+    ): MaterialCardView = sectionCard(title) {
+        addView(colorControls(title, prefKey, onReady))
+    }
+
+    private fun colorControls(
+        title: String,
+        prefKey: String,
+        onReady: (MaterialCardView, MaterialTextView) -> Unit = { _, _ -> }
+    ): View {
         val presetColors = listOf(
             Color.WHITE,
             NordPalette.Nord14,
@@ -525,7 +533,9 @@ class MainActivity : AppCompatActivity(), SharedPreferences.OnSharedPreferenceCh
             NordPalette.Nord15
         )
 
-        return sectionCard(title) {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+
             val current = prefs.getInt(prefKey, defaultColorFor(prefKey))
 
             val row = LinearLayout(context).apply {
