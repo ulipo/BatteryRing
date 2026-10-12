@@ -39,7 +39,6 @@ class BatteryRingView(context: Context) : View(context) {
 
     private var alertAnimator: ValueAnimator? = null
     private var alertMix = 0f
-    private var alertIntervalMs = 0L
     private var alertPulseScheduled = false
     private var activeAlertStyle: AlertStyle? = null
 
@@ -143,14 +142,37 @@ class BatteryRingView(context: Context) : View(context) {
     private fun startAlertPulse(alert: AlertStyle) {
         if (!isAttachedToWindow || windowVisibility != VISIBLE) return
 
-        alertIntervalMs = alert.intervalMs
         var cancelled = false
+        alertMix = 1f
+        postInvalidateOnAnimation()
 
-        alertAnimator = ValueAnimator.ofFloat(0f, 1f, 0f).apply {
-            duration = ALERT_PULSE_DURATION_MS
+        alertAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = when (alert.kind) {
+                AlertKind.WARNING -> WARNING_FADE_MS
+                AlertKind.CRITICAL -> CRITICAL_EFFECT_MS
+            }
             interpolator = LinearInterpolator()
             addUpdateListener {
-                alertMix = (it.animatedValue as Float).coerceIn(0f, 1f)
+                val elapsedMs = it.animatedFraction * duration.toFloat()
+                alertMix = when (alert.kind) {
+                    AlertKind.WARNING -> {
+                        // Warning: alert color appears immediately, then fades to normal.
+                        (1f - elapsedMs / WARNING_FADE_MS).coerceIn(0f, 1f)
+                    }
+                    AlertKind.CRITICAL -> {
+                        // Critical: first short flash, tiny gap, second abrupt flash,
+                        // then a 300 ms fade back to the normal ring color.
+                        when {
+                            elapsedMs < CRITICAL_FIRST_FLASH_MS -> 1f
+                            elapsedMs < CRITICAL_SECOND_FLASH_START_MS -> 0f
+                            else -> (
+                                1f -
+                                    (elapsedMs - CRITICAL_SECOND_FLASH_START_MS) /
+                                    CRITICAL_FADE_MS
+                                ).coerceIn(0f, 1f)
+                        }
+                    }
+                }
                 postInvalidateOnAnimation()
             }
             addListener(object : AnimatorListenerAdapter() {
@@ -181,7 +203,6 @@ class BatteryRingView(context: Context) : View(context) {
         removeCallbacks(alertRestartRunnable)
         alertPulseScheduled = false
         activeAlertStyle = null
-        alertIntervalMs = 0L
 
         val animator = alertAnimator
         alertAnimator = null
@@ -207,6 +228,7 @@ class BatteryRingView(context: Context) : View(context) {
 
         return when {
             batteryPercent <= criticalThreshold -> AlertStyle(
+                kind = AlertKind.CRITICAL,
                 color = prefs.getInt(
                     Prefs.KEY_CRITICAL_COLOR,
                     Prefs.DEFAULT_CRITICAL_COLOR
@@ -220,6 +242,7 @@ class BatteryRingView(context: Context) : View(context) {
             )
 
             batteryPercent <= warningThreshold -> AlertStyle(
+                kind = AlertKind.WARNING,
                 color = prefs.getInt(
                     Prefs.KEY_WARNING_COLOR,
                     Prefs.DEFAULT_WARNING_COLOR
@@ -324,7 +347,6 @@ class BatteryRingView(context: Context) : View(context) {
         val alert = currentAlertStyle() ?: return baseColor
         if (alertAnimator?.isRunning != true) return baseColor
 
-        // The 500 ms animator directly produces normal -> alert -> normal.
         return ColorUtils.blendARGB(baseColor, alert.color, alertMix)
     }
 
@@ -396,7 +418,13 @@ class BatteryRingView(context: Context) : View(context) {
         }
     }
 
+    private enum class AlertKind {
+        WARNING,
+        CRITICAL
+    }
+
     private data class AlertStyle(
+        val kind: AlertKind,
         val color: Int,
         val intervalMs: Long
     )
@@ -406,7 +434,14 @@ class BatteryRingView(context: Context) : View(context) {
         private const val CHARGING_REVEAL_PHASE = 0.70f
         private const val CHARGING_BASE_ALPHA = 96
 
-        private const val ALERT_PULSE_DURATION_MS = 500L
+        private const val WARNING_FADE_MS = 300L
+
+        private const val CRITICAL_FIRST_FLASH_MS = 60L
+        private const val CRITICAL_SECOND_FLASH_START_MS = 120L
+        private const val CRITICAL_FADE_MS = 300L
+        private const val CRITICAL_EFFECT_MS =
+            CRITICAL_SECOND_FLASH_START_MS + CRITICAL_FADE_MS
+
         private const val MIN_ALERT_INTERVAL_SECONDS = 0.5f
         private const val MAX_ALERT_INTERVAL_SECONDS = 10f
     }
